@@ -16,11 +16,13 @@ var app = Express();
 app.use(cors());
 app.use(Express.json())
 
+//Schema defining the format of how data is to be added into the database. 
 const noteSchema = mongoose.Schema({
   title: String,
   content: String
 })
 
+//Connection string to the database from the server.jsx file. 
 var mongoString = "mongodb+srv://memes:NwUXUv5P1sKm1xhH@cluster0.sxvjle4.mongodb.net/?retryWrites=true&w=majority";
 
 const keep = new mongoose.model("keep", noteSchema)
@@ -53,7 +55,7 @@ async function getNotes() {
 }
 
 /**
- * Endpoint for retrieving all notes.
+ * Endpoint for retrieving all notes/ the get request.
  */
  
 app.get('/api/notes/GetNotes', async (request, response) => {
