@@ -33,10 +33,10 @@ Front-end connection:
 - the server connects to the front-end, implementing the important functions from the App.jsx file:
 
 the post:
-    - Receives the post request from the App.jsx file, proccesses then if successful, meaning the note has been added to the database, it sends a response to the app.jsx'x addNote function which allows for the note and its contents to be displayed to the user.
+    - Receives the post request from the App.jsx file, proccesses then if successful, meaning the note has been added to the database, it sends a response to the app.jsx's addNote function which allows for the note and its contents to be displayed to the user.
 
 the delete:
-    - receives the delte parameter from the App.jsx file with the id. 
+    - receives the delete parameter from the App.jsx file with the id. 
     - Since the note to be deleted is also delted from the database, we have to check and use the ObjectId function to delete the specified note from the database. 
     - If the deletion is successfull, it sends a response back to the frontend server which then removes the deleted note from the list and UI.
 
