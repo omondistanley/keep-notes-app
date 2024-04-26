@@ -13,7 +13,8 @@ function App() {
   const [notes, setNotes] = useState([]);
 
   /**
-   * Fetches the notes from the API when the component mounts.
+   * Fetches the notes from the API when the component mounts. 
+   * Makes use of the get from the server.jsx file in the connection and database. 
    */
   useEffect(() => {
     async function fetchNotes() {
@@ -35,7 +36,8 @@ function App() {
   }, []);
 
   /**
-   * Stores the `notes` state in the local storage whenever it changes.
+   * Stores the `notes` state in the local storage whenever it changes. 
+   * (ensures it doesn't get lost on refresh??)
    */
   useEffect(() => {
     localStorage.setItem("notes", JSON.stringify(notes));
@@ -43,7 +45,7 @@ function App() {
 
   /**
    * Adds a new note to the `notes` state and the API.
-   *
+   * Makes use of the post from the server.jsx file in the connection & database. 
    * @param {Object} newNote - The new note to be added.
    */
   async function addNote(newNote) {
@@ -70,7 +72,7 @@ function App() {
 
   /**
    * Deletes a note from the `notes` state and the API.
-   *
+   * Makes use of the delete function from the server.jsx and the database. 
    * @param {string} id - The id of the note to be deleted.
    */
   async function deleteNote(id) {
