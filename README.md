@@ -7,6 +7,9 @@ Created with CodeSandbox
  - Node
  - React
 
+# Link to deployed version.
+https://dev-tech-topaz.vercel.app/
+
  Front-end(essentials)
 App.jsx
 - The App.jsx file has two very important functions which both implement the fetch function to connect to the bakend database:
