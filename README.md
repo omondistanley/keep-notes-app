@@ -12,7 +12,7 @@ https://dev-tech-topaz.vercel.app/
 
  Front-end(essentials)
 App.jsx
-- The App.jsx file has two very important functions which both implement the fetch function to connect to the bakend database:
+- The App.jsx file has two very important functions which both implement the fetch function to connect to the backend database:
 
 1: the addNote function:
     - when the add button is pressed, it sends a post request to the backend server for processing.
