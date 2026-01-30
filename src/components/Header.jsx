@@ -30,6 +30,8 @@ function Header({
   onSelectDraw,
   onSelectEnhanced,
   onSelectSearch,
+  sidebarCollapsed,
+  onSidebarCollapseToggle,
   sidebar = false
 }) {
   const handleNavSelect = (handler) => {
@@ -40,6 +42,20 @@ function Header({
   const handleReload = () => {
     window.location.reload();
   };
+
+  const collapseToggle =
+    sidebar && typeof onSidebarCollapseToggle === "function" ? (
+      <button
+        type="button"
+        className="sidebar-collapse-btn"
+        onClick={onSidebarCollapseToggle}
+        aria-expanded={!sidebarCollapsed}
+        aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+        title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+      >
+        {sidebarCollapsed ? "»" : "«"}
+      </button>
+    ) : null;
 
   const brandAndHamburger = (
     <>
@@ -63,6 +79,7 @@ function Header({
         <span className="hamburger-line" />
         <span className="hamburger-line" />
       </button>
+      {collapseToggle}
     </>
   );
 

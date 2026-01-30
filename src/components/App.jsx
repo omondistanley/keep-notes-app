@@ -58,6 +58,7 @@ function App() {
   const [financialChartLoading, setFinancialChartLoading] = useState(false);
   const [financialChartRange, setFinancialChartRange] = useState("1mo");
   const [navOpen, setNavOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [topMoversLoadingId, setTopMoversLoadingId] = useState(null);
   // eslint-disable-next-line no-unused-vars
   const [availableTags, setAvailableTags] = useState([]);
@@ -329,6 +330,29 @@ function App() {
 
   const totalPages = Math.ceil(notes.length / notesPerPage);
 
+  // Group notes by folder (first tag or "Notes" for unfiled)
+  const notesByFolder = useMemo(() => {
+    const map = new Map();
+    paginatedNotes.forEach((note) => {
+      const folderName = (note.tags && note.tags[0]) ? note.tags[0] : "Notes";
+      if (!map.has(folderName)) map.set(folderName, []);
+      map.get(folderName).push(note);
+    });
+    // Sort keys: "Notes" first, then alphabetical
+    const keys = Array.from(map.keys()).sort((a, b) => {
+      if (a === "Notes") return -1;
+      if (b === "Notes") return 1;
+      return a.localeCompare(b);
+    });
+    return keys.map((key) => ({ folder: key, notes: map.get(key) }));
+  }, [paginatedNotes]);
+
+  const handleSidebarNoteClick = useCallback((noteId) => {
+    closeAllModals();
+    setSelectedNoteIdForView(noteId);
+    setNavOpen(false);
+  }, [closeAllModals]);
+
   // Note: Removed localStorage sync as we're using server-side storage
 
   /**
@@ -483,11 +507,16 @@ function App() {
   return (
     <div style={{ background: theme === "dark" ? "#1a1a1a" : "#eee", minHeight: "100vh" }}>
       <div className="app-layout">
-        <aside className="app-sidebar">
+        <aside className={`app-sidebar ${sidebarCollapsed ? "app-sidebar--collapsed" : ""}`} aria-label="Sidebar">
           <Header
             sidebar
             navOpen={navOpen}
-            onNavToggle={setNavOpen}
+            onNavToggle={(open) => {
+              if (sidebarCollapsed && open) setSidebarCollapsed(false);
+              setNavOpen(open);
+            }}
+            sidebarCollapsed={sidebarCollapsed}
+            onSidebarCollapseToggle={() => setSidebarCollapsed((c) => !c)}
             activeView={activeView}
             onSelectNotes={() => { closeAllModals(); setNavOpen(false); }}
             onSelectDashboard={() => { setShowTrash(false); setShowExportImport(false); setShowDeadlines(false); setShowDashboard(true); }}
@@ -500,7 +529,7 @@ function App() {
             onSelectEnhanced={() => { setShowEnhancedForm(true); setSelectedNoteId(null); }}
             onSelectSearch={() => setTimeout(() => searchInputRef.current?.focus(), 0)}
           />
-          {navOpen && (
+          {!sidebarCollapsed && navOpen && (
             <>
               <div className="sidebar-search-wrap">
                 <input
@@ -533,36 +562,50 @@ function App() {
               </div>
               <div className="sidebar-notes-label"><span role="img" aria-label="Folder">📁</span> Saved notes</div>
               <div className="sidebar-notes-list">
-                {paginatedNotes.length === 0 ? (
-                  <p style={{ padding: "8px 12px", fontSize: "12px", color: "rgba(0,0,0,0.6)", margin: 0 }}>{searchQuery ? "No matches" : "No notes yet"}</p>
+                {notesByFolder.length === 0 ? (
+                  <p className="sidebar-empty-state">{searchQuery ? "No matches" : "No notes yet"}</p>
                 ) : (
-                  paginatedNotes.map((noteItem) => (
-                    <button
-                      key={noteItem._id}
-                      type="button"
-                      className={`sidebar-note-item ${selectedNoteIdForView === noteItem._id ? "active" : ""}`}
-                      onClick={() => setSelectedNoteIdForView(noteItem._id)}
-                    >
-                      {noteItem.title || "Untitled"}
-                    </button>
-                  ))
+                  <ul className="sidebar-folders" role="list">
+                    {notesByFolder.map(({ folder, notes: folderNotes }) => (
+                      <li key={folder} className="sidebar-folder">
+                        <span className="sidebar-folder-name" aria-hidden="true">
+                          <span role="img" aria-label="Folder">📁</span> {folder}
+                        </span>
+                        <ul className="sidebar-notes-inner" role="list">
+                          {folderNotes.map((noteItem) => (
+                            <li key={noteItem._id}>
+                              <button
+                                type="button"
+                                className={`sidebar-note-item ${selectedNoteIdForView === noteItem._id ? "active" : ""}`}
+                                onClick={() => handleSidebarNoteClick(noteItem._id)}
+                              >
+                                {noteItem.title || "Untitled"}
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      </li>
+                    ))}
+                  </ul>
                 )}
                 {totalPages > 1 && (
-                  <div style={{ display: "flex", gap: "6px", justifyContent: "center", marginTop: "8px", flexWrap: "wrap" }}>
+                  <div className="sidebar-pagination">
                     <button
                       type="button"
                       onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                       disabled={currentPage === 1}
-                      style={{ padding: "4px 10px", fontSize: "12px", border: "none", borderRadius: "4px", background: "rgba(255,255,255,0.3)", cursor: currentPage === 1 ? "not-allowed" : "pointer" }}
+                      className="sidebar-pagination-btn"
+                      aria-label="Previous page"
                     >
                       Prev
                     </button>
-                    <span style={{ padding: "4px 8px", fontSize: "12px" }}>{currentPage}/{totalPages}</span>
+                    <span className="sidebar-pagination-info" aria-live="polite">{currentPage}/{totalPages}</span>
                     <button
                       type="button"
                       onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                       disabled={currentPage === totalPages}
-                      style={{ padding: "4px 10px", fontSize: "12px", border: "none", borderRadius: "4px", background: "rgba(255,255,255,0.3)", cursor: currentPage === totalPages ? "not-allowed" : "pointer" }}
+                      className="sidebar-pagination-btn"
+                      aria-label="Next page"
                     >
                       Next
                     </button>
