@@ -49,7 +49,7 @@ body {
 .app-sidebar {
   width: 280px;
   min-width: 260px;
-  background: var(--bg-secondary, #fff);
+  background: var(--bg-primary, #eee);
   color: var(--text-primary, #333);
   display: flex;
   flex-direction: column;

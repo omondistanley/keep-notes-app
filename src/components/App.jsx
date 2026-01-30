@@ -297,6 +297,31 @@ function App() {
     }
   }, [fetchNotes, fetchTags]);
 
+  // Add content to current note (used in Split View – voice, drawing, text)
+  const onAddVoiceToNote = useCallback((transcript) => {
+    if (!selectedNoteId) return;
+    const note = notes.find((n) => n._id === selectedNoteId);
+    if (!note) return;
+    const newContent = (note.content || "").trim() + (note.content ? "\n\n" : "") + "[Voice]: " + transcript;
+    updateNote(selectedNoteId, { content: newContent });
+  }, [selectedNoteId, notes, updateNote]);
+
+  const onAddDrawingToNote = useCallback((dataURL) => {
+    if (!selectedNoteId) return;
+    const note = notes.find((n) => n._id === selectedNoteId);
+    if (!note) return;
+    const drawings = Array.isArray(note.drawings) ? [...note.drawings, dataURL] : [dataURL];
+    updateNote(selectedNoteId, { drawings });
+  }, [selectedNoteId, notes, updateNote]);
+
+  const onAddTextToNote = useCallback((text) => {
+    if (!selectedNoteId || !text.trim()) return;
+    const note = notes.find((n) => n._id === selectedNoteId);
+    if (!note) return;
+    const newContent = (note.content || "").trim() + (note.content ? "\n\n" : "") + text.trim();
+    updateNote(selectedNoteId, { content: newContent });
+  }, [selectedNoteId, notes, updateNote]);
+
   // Handle template selection
   const handleTemplateSelect = useCallback((templateData) => {
     addNote(templateData);
@@ -524,7 +549,10 @@ function App() {
             onSelectDeadlines={() => { setShowDashboard(false); setShowTrash(false); setShowExportImport(false); setShowDeadlines(true); }}
             onSelectTrash={() => { setShowDashboard(false); setShowExportImport(false); setShowDeadlines(false); setShowTrash(true); }}
             onSelectExportImport={() => { setShowTrash(false); setShowDashboard(false); setShowDeadlines(false); setShowExportImport(true); }}
-            onSelectSplitView={() => { setShowSplitView(true); }}
+            onSelectSplitView={() => {
+              setShowSplitView(true);
+              if (selectedNoteIdForView) setSelectedNoteId(selectedNoteIdForView);
+            }}
             onSelectVoice={() => { setShowVoiceRecorder(true); setShowDrawing(false); }}
             onSelectDraw={() => { setShowDrawing(true); setShowVoiceRecorder(false); }}
             onSelectEnhanced={() => { setShowEnhancedForm(true); setSelectedNoteId(null); }}
@@ -1101,6 +1129,9 @@ function App() {
             onUpdateFinancial={updateFinancialForNote}
             onUpdateAll={updateAllForNote}
             onIntegrationComplete={fetchNotes}
+            onAddVoiceToNote={onAddVoiceToNote}
+            onAddDrawingToNote={onAddDrawingToNote}
+            onAddTextToNote={onAddTextToNote}
           />
         </div>
       )}
