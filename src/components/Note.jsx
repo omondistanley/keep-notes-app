@@ -73,10 +73,6 @@ function Note(props) {
     }
   }
 
-  function handleEdit() {
-    setIsEditing(true);
-  }
-
   function handleSave() {
     props.onUpdate(props.id, {
       title: editTitle,
