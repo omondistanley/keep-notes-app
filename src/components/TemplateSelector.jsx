@@ -1,13 +1,20 @@
 import React, { useState, useEffect } from "react";
 import { API_BASE } from "../config";
 
-const TemplateSelector = ({ onSelectTemplate }) => {
+const TemplateSelector = ({ onSelectTemplate, open, onClose }) => {
   const [templates, setTemplates] = useState([]);
   const [showSelector, setShowSelector] = useState(false);
+
+  const isControlled = open !== undefined;
+  const isOpen = isControlled ? open : showSelector;
 
   useEffect(() => {
     fetchTemplates();
   }, []);
+
+  useEffect(() => {
+    if (isControlled && open) setShowSelector(true);
+  }, [isControlled, open]);
 
   async function fetchTemplates() {
     try {
@@ -52,73 +59,100 @@ const TemplateSelector = ({ onSelectTemplate }) => {
       onSelectTemplate(processed);
     }
     setShowSelector(false);
+    if (isControlled && onClose) onClose();
+  }
+
+  function handleClose() {
+    setShowSelector(false);
+    if (isControlled && onClose) onClose();
   }
 
   return (
     <div>
-      <button
-        onClick={() => setShowSelector(!showSelector)}
-        style={{
-          padding: "8px 16px",
-          background: "#2196F3",
-          color: "white",
-          border: "none",
-          borderRadius: "4px",
-          cursor: "pointer",
-          marginBottom: "10px"
-        }}
-      >
-        <span role="img" aria-label="Template">📋</span> Use Template
-      </button>
-
-      {showSelector && (
-        <div
+      {!isControlled && (
+        <button
+          onClick={() => setShowSelector(!showSelector)}
           style={{
-            position: "absolute",
-            background: "var(--bg-secondary)",
-            border: "1px solid var(--border-color)",
+            padding: "8px 16px",
+            background: "#2196F3",
+            color: "white",
+            border: "none",
             borderRadius: "4px",
-            padding: "15px",
-            boxShadow: "0 4px 6px var(--shadow)",
-            zIndex: 1000,
-            minWidth: "250px"
+            cursor: "pointer",
+            marginBottom: "10px"
           }}
         >
-          <h4 style={{ marginBottom: "10px", color: "var(--text-primary)" }}>Select Template</h4>
-          {templates.map((template) => (
+          <span role="img" aria-label="Template">📋</span> Use Template
+        </button>
+      )}
+
+      {isOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Select template"
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.4)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1100,
+            padding: "20px"
+          }}
+          onClick={handleClose}
+        >
+          <div
+            style={{
+              background: "var(--bg-secondary)",
+              border: "1px solid var(--border-color)",
+              borderRadius: "8px",
+              padding: "20px",
+              boxShadow: "0 4px 20px var(--shadow)",
+              minWidth: "280px",
+              maxWidth: "90vw"
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h4 style={{ marginBottom: "12px", color: "var(--text-primary)" }}>Select Template</h4>
+            {templates.map((template) => (
+              <button
+                key={template.id}
+                onClick={() => handleSelectTemplate(template)}
+                style={{
+                  display: "block",
+                  width: "100%",
+                  padding: "10px 12px",
+                  marginBottom: "6px",
+                  background: "var(--bg-tertiary)",
+                  color: "var(--text-primary)",
+                  border: "1px solid var(--border-color)",
+                  borderRadius: "6px",
+                  cursor: "pointer",
+                  textAlign: "left",
+                  fontSize: "14px"
+                }}
+              >
+                {template.name}
+              </button>
+            ))}
             <button
-              key={template.id}
-              onClick={() => handleSelectTemplate(template)}
+              onClick={handleClose}
               style={{
-                display: "block",
-                width: "100%",
-                padding: "10px",
-                marginBottom: "5px",
-                background: "var(--bg-tertiary)",
-                color: "var(--text-primary)",
-                border: "1px solid var(--border-color)",
-                borderRadius: "4px",
+                marginTop: "12px",
+                padding: "8px 16px",
+                background: "#666",
+                color: "white",
+                border: "none",
+                borderRadius: "6px",
                 cursor: "pointer",
-                textAlign: "left"
+                fontSize: "14px"
               }}
             >
-              {template.name}
+              Cancel
             </button>
-          ))}
-          <button
-            onClick={() => setShowSelector(false)}
-            style={{
-              marginTop: "10px",
-              padding: "6px 12px",
-              background: "#999",
-              color: "white",
-              border: "none",
-              borderRadius: "4px",
-              cursor: "pointer"
-            }}
-          >
-            Cancel
-          </button>
+          </div>
         </div>
       )}
     </div>

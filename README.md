@@ -154,8 +154,32 @@ Test integrations (with server running): `node scripts/test-integrations.js`
 
 ## Deploying
 
+### Heroku (single app)
+
+Deploy backend + frontend together. Use Heroku Postgres for persistent data.
+
+```bash
+heroku create your-app-name
+heroku addons:create heroku-postgresql:mini   # sets DATABASE_URL
+git push heroku main
+heroku open
+```
+
+See **[HEROKU.md](HEROKU.md)** for full steps, config vars, and troubleshooting.
+
+### Other hosts
+
 - **Frontend:** Deploy the React app to Vercel (build: `npm run build`, output: `build`). Set `REACT_APP_API_URL` and optionally `REACT_APP_WS_URL` (defaults to same host as API, using `ws://`/`wss://`) to your backend URL.
 - **Backend:** Deploy Express + DB to Render, Railway, Fly.io, or similar. Use `DATABASE_TYPE=postgres` and set CORS to your Vercel frontend origin.
+
+### Test on your phone (no App Store)
+
+Use **Add to Home Screen** so the app opens like a native app:
+
+- **iPhone:** Safari → open your app URL → Share → **Add to Home Screen** → Add.
+- **Android:** Chrome → your app URL → menu → **Add to Home screen** / **Install app**.
+
+See **[PHONE-TESTING.md](PHONE-TESTING.md)** for step-by-step and optional icon setup.
 
 ---
 

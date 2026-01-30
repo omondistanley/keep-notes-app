@@ -1,0 +1,24 @@
+{
+  "name": "Keep Notes App",
+  "description": "Context-aware research and note-taking app with news, financial, and social integrations.",
+  "repository": "",
+  "keywords": ["node", "express", "react", "notes", "sqlite", "postgres"],
+  "buildpacks": [
+    { "url": "heroku/nodejs" }
+  ],
+  "formation": {
+    "web": {
+      "quantity": 1,
+      "size": "basic"
+    }
+  },
+  "addons": [
+    "heroku-postgresql:mini"
+  ],
+  "env": {
+    "NODE_ENV": {
+      "description": "Environment (production on Heroku).",
+      "value": "production"
+    }
+  }
+}

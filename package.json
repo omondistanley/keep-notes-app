@@ -57,7 +57,7 @@
     "build": "NODE_OPTIONS='--openssl-legacy-provider' react-scripts build",
     "postinstall": "node scripts/fix-build-patches.js",
     "fix-build": "node scripts/fix-build-patches.js",
-    "heroku-postbuild": "npm run build",
+    "heroku-postbuild": "CI= npm run build",
     "test": "react-scripts test --env=jsdom",
     "eject": "react-scripts eject"
   },

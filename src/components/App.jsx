@@ -71,6 +71,7 @@ function App() {
   const [currentPage, setCurrentPage] = useState(1);
   const [notesPerPage] = useState(20);
   const [selectedNoteIdForView, setSelectedNoteIdForView] = useState(null);
+  const [showTemplateSelector, setShowTemplateSelector] = useState(false);
   const [notificationUnreadCount, setNotificationUnreadCount] = useState(0);
   const [showNotificationPanel, setShowNotificationPanel] = useState(false);
   const [toastNotification, setToastNotification] = useState(null);
@@ -641,132 +642,117 @@ function App() {
         </div>
       )}
       <div className="app-layout">
-        <aside className={`app-sidebar ${sidebarCollapsed ? "app-sidebar--collapsed" : ""}`} aria-label="Sidebar">
-          <Header
-            sidebar
-            navOpen={navOpen}
-            onNavToggle={(open) => {
-              if (sidebarCollapsed && open) setSidebarCollapsed(false);
-              setNavOpen(open);
-            }}
-            sidebarCollapsed={sidebarCollapsed}
-            onBrandSingleTap={() => setSidebarCollapsed((c) => !c)}
-            onBrandDoubleTap={() => window.location.reload()}
-            activeView={activeView}
-            onSelectNotes={() => { closeAllModals(); setNavOpen(false); }}
-            onSelectDashboard={() => { setShowTrash(false); setShowExportImport(false); setShowDeadlines(false); setShowDashboard(true); }}
-            onSelectDeadlines={() => { setShowDashboard(false); setShowTrash(false); setShowExportImport(false); setShowDeadlines(true); }}
-            onSelectTrash={() => { setShowDashboard(false); setShowExportImport(false); setShowDeadlines(false); setShowTrash(true); }}
-            onSelectExportImport={() => { setShowTrash(false); setShowDashboard(false); setShowDeadlines(false); setShowExportImport(true); }}
-            onSelectSplitView={() => {
-              setShowSplitView(true);
-              if (selectedNoteIdForView) setSelectedNoteId(selectedNoteIdForView);
-            }}
-            onSelectVoice={() => { setShowVoiceRecorder(true); setShowDrawing(false); }}
-            onSelectDraw={() => { setShowDrawing(true); setShowVoiceRecorder(false); }}
-            onSelectEnhanced={() => { setShowEnhancedForm(true); setSelectedNoteId(null); }}
-            onSelectSearch={() => setTimeout(() => searchInputRef.current?.focus(), 0)}
-            notificationUnreadCount={notificationUnreadCount}
-            showNotificationPanel={showNotificationPanel}
-            onNotificationPanelToggle={() => setShowNotificationPanel((v) => !v)}
-            onNotificationsRefresh={fetchNotificationCount}
-          />
-          {!sidebarCollapsed && (
-            <>
-              <div className="sidebar-search-wrap">
-                <input
-                  ref={searchInputRef}
-                  type="text"
-                  placeholder="Search notes..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="sidebar-search-input"
-                  aria-label="Search notes"
-                />
-                <div className="sidebar-sort-row">
-                  <select
-                    value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value)}
-                    className="sidebar-sort-select"
-                    aria-label="Sort by"
-                  >
-                    <option value="updatedAt">Updated</option>
-                    <option value="createdAt">Created</option>
-                    <option value="title">Title</option>
-                    <option value="priority">Priority</option>
-                  </select>
+        <Header
+          topBar
+          navOpen={navOpen}
+          onNavToggle={setNavOpen}
+          activeView={activeView}
+          onSelectNotes={() => { closeAllModals(); setNavOpen(false); }}
+          onSelectDashboard={() => { setShowTrash(false); setShowExportImport(false); setShowDeadlines(false); setShowDashboard(true); setNavOpen(false); }}
+          onSelectDeadlines={() => { setShowDashboard(false); setShowTrash(false); setShowExportImport(false); setShowDeadlines(true); setNavOpen(false); }}
+          onSelectTrash={() => { setShowDashboard(false); setShowExportImport(false); setShowDeadlines(false); setShowTrash(true); setNavOpen(false); }}
+          onSelectExportImport={() => { setShowTrash(false); setShowDashboard(false); setShowDeadlines(false); setShowExportImport(true); setNavOpen(false); }}
+          onSelectSplitView={() => {
+            setShowSplitView(true);
+            if (selectedNoteIdForView) setSelectedNoteId(selectedNoteIdForView);
+            setNavOpen(false);
+          }}
+          onSelectVoice={() => { setShowVoiceRecorder(true); setShowDrawing(false); setNavOpen(false); }}
+          onSelectDraw={() => { setShowDrawing(true); setShowVoiceRecorder(false); setNavOpen(false); }}
+          onSelectEnhanced={() => { setShowEnhancedForm(true); setSelectedNoteId(null); setNavOpen(false); }}
+          onSelectSearch={() => { setTimeout(() => searchInputRef.current?.focus(), 0); setNavOpen(false); }}
+          notificationUnreadCount={notificationUnreadCount}
+          showNotificationPanel={showNotificationPanel}
+          onNotificationPanelToggle={() => setShowNotificationPanel((v) => !v)}
+          onNotificationsRefresh={fetchNotificationCount}
+          rightSlot={<ThemeToggle />}
+        />
+
+        {navOpen && (
+          <>
+            <div className="nav-backdrop" onClick={() => setNavOpen(false)} aria-hidden="true" />
+            <aside className="nav-drawer nav-drawer--left" role="navigation" aria-label="Menu">
+              <ul className="nav-list" style={{ listStyle: "none", padding: 0, margin: "0 0 16px 0" }}>
+                <li>
                   <button
                     type="button"
-                    onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
-                    className="sidebar-sort-order-btn"
-                    aria-label={sortOrder === "asc" ? "Sort ascending" : "Sort descending"}
-                    title={sortOrder === "asc" ? "Ascending" : "Descending"}
+                    style={{ display: "block", width: "100%", padding: "12px 16px", textAlign: "left", border: "none", background: "var(--bg-tertiary)", color: "inherit", cursor: "pointer", borderRadius: "6px", marginBottom: "4px", fontSize: "15px" }}
+                    onClick={() => { setShowTemplateSelector(true); setNavOpen(false); }}
                   >
-                    {sortOrder === "asc" ? "↑" : "↓"}
+                    <span role="img" aria-label="Template">📋</span> Use Template
                   </button>
+                </li>
+                <li><button type="button" style={{ display: "block", width: "100%", padding: "12px 16px", textAlign: "left", border: "none", background: "transparent", color: "inherit", cursor: "pointer", borderRadius: "6px", marginBottom: "4px", fontSize: "15px" }} onClick={() => { setTimeout(() => searchInputRef.current?.focus(), 0); setNavOpen(false); }}><span role="img" aria-label="Search">🔍</span> Search Notes</button></li>
+                <li><button type="button" style={{ display: "block", width: "100%", padding: "12px 16px", textAlign: "left", border: "none", background: activeView === "notes" ? "var(--bg-tertiary)" : "transparent", color: "inherit", cursor: "pointer", borderRadius: "6px", marginBottom: "4px", fontSize: "15px" }} onClick={() => { closeAllModals(); setNavOpen(false); }}><span role="img" aria-label="Notes">📋</span> Notes</button></li>
+                <li><button type="button" style={{ display: "block", width: "100%", padding: "12px 16px", textAlign: "left", border: "none", background: activeView === "dashboard" ? "var(--bg-tertiary)" : "transparent", color: "inherit", cursor: "pointer", borderRadius: "6px", marginBottom: "4px", fontSize: "15px" }} onClick={() => { setShowTrash(false); setShowExportImport(false); setShowDeadlines(false); setShowDashboard(true); setNavOpen(false); }}><span role="img" aria-label="Dashboard">📊</span> Dashboard</button></li>
+                <li><button type="button" style={{ display: "block", width: "100%", padding: "12px 16px", textAlign: "left", border: "none", background: activeView === "deadlines" ? "var(--bg-tertiary)" : "transparent", color: "inherit", cursor: "pointer", borderRadius: "6px", marginBottom: "4px", fontSize: "15px" }} onClick={() => { setShowDashboard(false); setShowTrash(false); setShowExportImport(false); setShowDeadlines(true); setNavOpen(false); }}><span role="img" aria-label="Deadlines">📅</span> Deadlines</button></li>
+                <li><button type="button" style={{ display: "block", width: "100%", padding: "12px 16px", textAlign: "left", border: "none", background: activeView === "trash" ? "var(--bg-tertiary)" : "transparent", color: "inherit", cursor: "pointer", borderRadius: "6px", marginBottom: "4px", fontSize: "15px" }} onClick={() => { setShowDashboard(false); setShowExportImport(false); setShowDeadlines(false); setShowTrash(true); setNavOpen(false); }}><span role="img" aria-label="Trash">🗑️</span> Trash</button></li>
+                <li><button type="button" style={{ display: "block", width: "100%", padding: "12px 16px", textAlign: "left", border: "none", background: activeView === "exportImport" ? "var(--bg-tertiary)" : "transparent", color: "inherit", cursor: "pointer", borderRadius: "6px", marginBottom: "4px", fontSize: "15px" }} onClick={() => { setShowTrash(false); setShowDashboard(false); setShowDeadlines(false); setShowExportImport(true); setNavOpen(false); }}><span role="img" aria-label="Export Import">📤</span> Export / Import</button></li>
+                <li><button type="button" style={{ display: "block", width: "100%", padding: "12px 16px", textAlign: "left", border: "none", background: "transparent", color: "inherit", cursor: "pointer", borderRadius: "6px", marginBottom: "4px", fontSize: "15px" }} onClick={() => { setShowSplitView(true); if (selectedNoteIdForView) setSelectedNoteId(selectedNoteIdForView); setNavOpen(false); }}><span role="img" aria-label="Split view">⬌</span> Split View</button></li>
+                <li><button type="button" style={{ display: "block", width: "100%", padding: "12px 16px", textAlign: "left", border: "none", background: "transparent", color: "inherit", cursor: "pointer", borderRadius: "6px", marginBottom: "4px", fontSize: "15px" }} onClick={() => { setShowVoiceRecorder(true); setShowDrawing(false); setNavOpen(false); }}><span role="img" aria-label="Voice">🎤</span> Voice</button></li>
+                <li><button type="button" style={{ display: "block", width: "100%", padding: "12px 16px", textAlign: "left", border: "none", background: "transparent", color: "inherit", cursor: "pointer", borderRadius: "6px", marginBottom: "4px", fontSize: "15px" }} onClick={() => { setShowDrawing(true); setShowVoiceRecorder(false); setNavOpen(false); }}><span role="img" aria-label="Draw">✏️</span> Draw</button></li>
+                <li><button type="button" style={{ display: "block", width: "100%", padding: "12px 16px", textAlign: "left", border: "none", background: "transparent", color: "inherit", cursor: "pointer", borderRadius: "6px", marginBottom: "4px", fontSize: "15px" }} onClick={() => { setShowEnhancedForm(true); setSelectedNoteId(null); setNavOpen(false); }}><span role="img" aria-label="Enhanced">＋</span> Enhanced</button></li>
+              </ul>
+              <div className="drawer-nav-section">
+                <div className="drawer-nav-section-title"><span role="img" aria-hidden="true">🔍</span> Search &amp; notes</div>
+                <div className="sidebar-search-wrap">
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    placeholder="Search notes..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="sidebar-search-input"
+                    aria-label="Search notes"
+                  />
+                  <div className="sidebar-sort-row">
+                    <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="sidebar-sort-select" aria-label="Sort by">
+                      <option value="updatedAt">Updated</option>
+                      <option value="createdAt">Created</option>
+                      <option value="title">Title</option>
+                      <option value="priority">Priority</option>
+                    </select>
+                    <button type="button" onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")} className="sidebar-sort-order-btn" aria-label={sortOrder === "asc" ? "Sort ascending" : "Sort descending"} title={sortOrder === "asc" ? "Ascending" : "Descending"}>{sortOrder === "asc" ? "↑" : "↓"}</button>
+                  </div>
+                </div>
+                <div className="sidebar-notes-label"><span role="img" aria-hidden="true">📁</span> Saved notes</div>
+                <div className="sidebar-notes-list" role="navigation" aria-label="Saved notes">
+                  {notesByFolder.length === 0 ? (
+                    <p className="sidebar-empty-state">{searchQuery ? "No matches" : "No notes yet"}</p>
+                  ) : (
+                    <ul className="sidebar-folders">
+                      {notesByFolder.map(({ folder, notes: folderNotes }) => (
+                        <li key={folder} className="sidebar-folder">
+                          <span className="sidebar-folder-name"><span role="img" aria-hidden="true">📁</span> {folder}</span>
+                          <ul className="sidebar-notes-inner">
+                            {folderNotes.map((noteItem) => (
+                              <li key={noteItem._id}>
+                                <button type="button" className={`sidebar-note-item ${selectedNoteIdForView === noteItem._id ? "active" : ""}`} onClick={() => handleSidebarNoteClick(noteItem._id)} aria-label={`Open note: ${noteItem.title || "Untitled"}`} aria-current={selectedNoteIdForView === noteItem._id ? "true" : undefined}>
+                                  <span className="sidebar-note-item-title">{noteItem.title || "Untitled"}</span>
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {totalPages > 1 && (
+                    <div className="sidebar-pagination">
+                      <button type="button" onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1} className="sidebar-pagination-btn" aria-label="Previous page">Prev</button>
+                      <span className="sidebar-pagination-info" aria-live="polite">{currentPage}/{totalPages}</span>
+                      <button type="button" onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="sidebar-pagination-btn" aria-label="Next page">Next</button>
+                    </div>
+                  )}
                 </div>
               </div>
-              <div className="sidebar-notes-label">
-                <span role="img" aria-hidden="true">📁</span> Saved notes
-              </div>
-              <div className="sidebar-notes-list" role="navigation" aria-label="Saved notes">
-                {notesByFolder.length === 0 ? (
-                  <p className="sidebar-empty-state">{searchQuery ? "No matches" : "No notes yet"}</p>
-                ) : (
-                  <ul className="sidebar-folders">
-                    {notesByFolder.map(({ folder, notes: folderNotes }) => (
-                      <li key={folder} className="sidebar-folder">
-                        <span className="sidebar-folder-name">
-                          <span role="img" aria-hidden="true">📁</span> {folder}
-                        </span>
-                        <ul className="sidebar-notes-inner">
-                          {folderNotes.map((noteItem) => (
-                            <li key={noteItem._id}>
-                              <button
-                                type="button"
-                                className={`sidebar-note-item ${selectedNoteIdForView === noteItem._id ? "active" : ""}`}
-                                onClick={() => handleSidebarNoteClick(noteItem._id)}
-                                aria-label={`Open note: ${noteItem.title || "Untitled"}`}
-                                aria-current={selectedNoteIdForView === noteItem._id ? "true" : undefined}
-                              >
-                                <span className="sidebar-note-item-title">{noteItem.title || "Untitled"}</span>
-                              </button>
-                            </li>
-                          ))}
-                        </ul>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                {totalPages > 1 && (
-                  <div className="sidebar-pagination">
-                    <button
-                      type="button"
-                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                      disabled={currentPage === 1}
-                      className="sidebar-pagination-btn"
-                      aria-label="Previous page"
-                    >
-                      Prev
-                    </button>
-                    <span className="sidebar-pagination-info" aria-live="polite">{currentPage}/{totalPages}</span>
-                    <button
-                      type="button"
-                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                      disabled={currentPage === totalPages}
-                      className="sidebar-pagination-btn"
-                      aria-label="Next page"
-                    >
-                      Next
-                    </button>
-                  </div>
-                )}
-              </div>
-            </>
-          )}
-        </aside>
+            </aside>
+          </>
+        )}
+
+        <TemplateSelector open={showTemplateSelector} onClose={() => setShowTemplateSelector(false)} onSelectTemplate={handleTemplateSelect} />
+
         <main className="app-main">
-          <ThemeToggle />
       
       <CommandPalette
         isOpen={showCommandPalette}
@@ -1350,9 +1336,6 @@ function App() {
 
       {!showSplitView && !showEnhancedForm && !showVoiceRecorder && !showDrawing ? (
         <div className="app-main-content">
-          <div style={{ position: "relative", marginBottom: "16px" }}>
-            <TemplateSelector onSelectTemplate={handleTemplateSelect} />
-          </div>
           <CreateArea onAdd={addNote} />
           {selectedNoteIdForView ? (() => {
             const noteItem = notes.find(n => n._id === selectedNoteIdForView);
@@ -1393,7 +1376,7 @@ function App() {
             );
           })() : (
             <div className="app-main-placeholder">
-              Select a note from the left or create one above.
+              Select a note from the menu or create one above.
             </div>
           )}
         </div>

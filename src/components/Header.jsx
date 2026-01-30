@@ -17,8 +17,6 @@ const navItemStyle = (active) => ({
   marginBottom: "4px"
 });
 
-const DOUBLE_TAP_DELAY_MS = 300;
-
 function Header({
   navOpen,
   onNavToggle,
@@ -37,24 +35,108 @@ function Header({
   onBrandSingleTap,
   onBrandDoubleTap,
   sidebar = false,
+  /** When true, render compact top bar (hamburger left, title center, bell + rightSlot right). Drawer is rendered by parent. */
+  topBar = false,
+  /** Slot for right side of top bar (e.g. ThemeToggle) */
+  rightSlot = null,
   notificationUnreadCount = 0,
   showNotificationPanel = false,
   onNotificationPanelToggle,
   onNotificationsRefresh
 }) {
-  const lastTapRef = useRef(0);
-  const singleTapTimerRef = useRef(null);
-
   const handleNavSelect = (handler) => {
     if (typeof handler === "function") handler();
     onNavToggle(false);
   };
 
+  /* Compact top bar: hamburger left, title center, bell + theme right */
+  if (topBar) {
+    return (
+      <div className="app-top-bar" role="banner">
+        <div className="top-bar-left">
+          <button
+            type="button"
+            className="sidebar-hamburger"
+            onClick={() => onNavToggle(!navOpen)}
+            aria-expanded={navOpen}
+            aria-label={navOpen ? "Close menu" : "Open menu"}
+          >
+            <span className="hamburger-line" />
+            <span className="hamburger-line" />
+            <span className="hamburger-line" />
+          </button>
+        </div>
+        <div className="top-bar-center">
+          <img src="/logo.png" alt="yApSs" className="top-bar-logo" />
+        </div>
+        <div className="top-bar-right">
+          {typeof onNotificationPanelToggle === "function" && (
+            <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+              <button
+                type="button"
+                onClick={onNotificationPanelToggle}
+                aria-label={showNotificationPanel ? "Close notifications" : "Open notifications"}
+                aria-expanded={showNotificationPanel}
+                style={{
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  padding: "8px",
+                  fontSize: "20px",
+                  position: "relative",
+                  color: "inherit"
+                }}
+              >
+                <span role="img" aria-hidden="true">🔔</span>
+                {notificationUnreadCount > 0 && (
+                  <span
+                    style={{
+                      position: "absolute",
+                      top: 2,
+                      right: 2,
+                      minWidth: "18px",
+                      height: "18px",
+                      borderRadius: "9px",
+                      background: "#e53935",
+                      color: "#fff",
+                      fontSize: "11px",
+                      fontWeight: "bold",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      padding: "0 4px"
+                    }}
+                  >
+                    {notificationUnreadCount > 99 ? "99+" : notificationUnreadCount}
+                  </span>
+                )}
+              </button>
+              <NotificationCenter
+                isOpen={showNotificationPanel}
+                onClose={() => typeof onNotificationPanelToggle === "function" && onNotificationPanelToggle(false)}
+                onMarkRead={() => typeof onNotificationsRefresh === "function" && onNotificationsRefresh()}
+                onMarkAllRead={() => typeof onNotificationsRefresh === "function" && onNotificationsRefresh()}
+                unreadCount={notificationUnreadCount}
+                notifications={[]}
+                onRefresh={onNotificationsRefresh}
+              />
+            </div>
+          )}
+          {rightSlot}
+        </div>
+      </div>
+    );
+  }
+
+  /* Legacy sidebar layout */
+  const DOUBLE_TAP_DELAY_MS = 300;
+  const lastTapRef = useRef(0);
+  const singleTapTimerRef = useRef(null);
+
   const handleBrandClick = () => {
     const now = Date.now();
     const isDoubleTap = now - lastTapRef.current <= DOUBLE_TAP_DELAY_MS;
     lastTapRef.current = now;
-
     if (isDoubleTap) {
       if (singleTapTimerRef.current) {
         clearTimeout(singleTapTimerRef.current);
@@ -63,7 +145,6 @@ function Header({
       if (typeof onBrandDoubleTap === "function") onBrandDoubleTap();
       return;
     }
-
     singleTapTimerRef.current = setTimeout(() => {
       singleTapTimerRef.current = null;
       if (typeof onBrandSingleTap === "function") onBrandSingleTap();
@@ -76,11 +157,11 @@ function Header({
         type="button"
         className="header-title sidebar-brand-title"
         onClick={handleBrandClick}
-        style={{ background: "none", border: "none", cursor: "pointer", font: "inherit", padding: 0 }}
+        style={{ background: "none", border: "none", cursor: "pointer", font: "inherit", padding: 0, display: "flex", alignItems: "center" }}
         aria-label="Tap to open or close sidebar, double-tap to reload"
         title="Tap to open/close sidebar, double-tap to reload"
       >
-        yApSs
+        <img src="/logo.png" alt="yApSs" className="sidebar-logo" />
       </button>
       <button
         type="button"
@@ -153,103 +234,19 @@ function Header({
         )}
         {navOpen && (
           <>
-            <div
-              className="nav-backdrop"
-              onClick={() => onNavToggle(false)}
-              aria-hidden="true"
-            />
+            <div className="nav-backdrop" onClick={() => onNavToggle(false)} aria-hidden="true" />
             <nav className="nav-drawer" role="navigation" aria-label="Main navigation">
               <ul className="nav-list">
-                <li>
-                  <button
-                    type="button"
-                    style={navItemStyle(false)}
-                    onClick={() => { if (typeof onSelectSearch === "function") onSelectSearch(); }}
-                  >
-                    <span role="img" aria-label="Search">🔍</span> Search Notes
-                  </button>
-                </li>
-                <li>
-                  <button
-                    type="button"
-                    style={navItemStyle(activeView === "notes")}
-                    onClick={() => handleNavSelect(onSelectNotes)}
-                  >
-                    <span role="img" aria-label="Notes">📋</span> Notes
-                  </button>
-                </li>
-                <li>
-                  <button
-                    type="button"
-                    style={navItemStyle(activeView === "dashboard")}
-                    onClick={() => handleNavSelect(onSelectDashboard)}
-                  >
-                    <span role="img" aria-label="Dashboard">📊</span> Dashboard
-                  </button>
-                </li>
-                <li>
-                  <button
-                    type="button"
-                    style={navItemStyle(activeView === "deadlines")}
-                    onClick={() => handleNavSelect(onSelectDeadlines)}
-                  >
-                    <span role="img" aria-label="Deadlines">📅</span> Deadlines
-                  </button>
-                </li>
-                <li>
-                  <button
-                    type="button"
-                    style={navItemStyle(activeView === "trash")}
-                    onClick={() => handleNavSelect(onSelectTrash)}
-                  >
-                    <span role="img" aria-label="Trash">🗑️</span> Trash
-                  </button>
-                </li>
-                <li>
-                  <button
-                    type="button"
-                    style={navItemStyle(activeView === "exportImport")}
-                    onClick={() => handleNavSelect(onSelectExportImport)}
-                  >
-                    <span role="img" aria-label="Export Import">📤</span> Export / Import
-                  </button>
-                </li>
-                <li>
-                  <button
-                    type="button"
-                    style={navItemStyle(false)}
-                    onClick={() => handleNavSelect(onSelectSplitView)}
-                  >
-                    <span role="img" aria-label="Split view">⬌</span> Split View
-                  </button>
-                </li>
-                <li>
-                  <button
-                    type="button"
-                    style={navItemStyle(false)}
-                    onClick={() => handleNavSelect(onSelectVoice)}
-                  >
-                    <span role="img" aria-label="Voice">🎤</span> Voice
-                  </button>
-                </li>
-                <li>
-                  <button
-                    type="button"
-                    style={navItemStyle(false)}
-                    onClick={() => handleNavSelect(onSelectDraw)}
-                  >
-                    <span role="img" aria-label="Draw">✏️</span> Draw
-                  </button>
-                </li>
-                <li>
-                  <button
-                    type="button"
-                    style={navItemStyle(false)}
-                    onClick={() => handleNavSelect(onSelectEnhanced)}
-                  >
-                    <span role="img" aria-label="Enhanced">＋</span> Enhanced
-                  </button>
-                </li>
+                <li><button type="button" style={navItemStyle(false)} onClick={() => { if (typeof onSelectSearch === "function") onSelectSearch(); }}><span role="img" aria-label="Search">🔍</span> Search Notes</button></li>
+                <li><button type="button" style={navItemStyle(activeView === "notes")} onClick={() => handleNavSelect(onSelectNotes)}><span role="img" aria-label="Notes">📋</span> Notes</button></li>
+                <li><button type="button" style={navItemStyle(activeView === "dashboard")} onClick={() => handleNavSelect(onSelectDashboard)}><span role="img" aria-label="Dashboard">📊</span> Dashboard</button></li>
+                <li><button type="button" style={navItemStyle(activeView === "deadlines")} onClick={() => handleNavSelect(onSelectDeadlines)}><span role="img" aria-label="Deadlines">📅</span> Deadlines</button></li>
+                <li><button type="button" style={navItemStyle(activeView === "trash")} onClick={() => handleNavSelect(onSelectTrash)}><span role="img" aria-label="Trash">🗑️</span> Trash</button></li>
+                <li><button type="button" style={navItemStyle(activeView === "exportImport")} onClick={() => handleNavSelect(onSelectExportImport)}><span role="img" aria-label="Export Import">📤</span> Export / Import</button></li>
+                <li><button type="button" style={navItemStyle(false)} onClick={() => handleNavSelect(onSelectSplitView)}><span role="img" aria-label="Split view">⬌</span> Split View</button></li>
+                <li><button type="button" style={navItemStyle(false)} onClick={() => handleNavSelect(onSelectVoice)}><span role="img" aria-label="Voice">🎤</span> Voice</button></li>
+                <li><button type="button" style={navItemStyle(false)} onClick={() => handleNavSelect(onSelectDraw)}><span role="img" aria-label="Draw">✏️</span> Draw</button></li>
+                <li><button type="button" style={navItemStyle(false)} onClick={() => handleNavSelect(onSelectEnhanced)}><span role="img" aria-label="Enhanced">＋</span> Enhanced</button></li>
               </ul>
             </nav>
           </>
@@ -260,109 +257,22 @@ function Header({
 
   return (
     <header className="app-header">
-      <div className="header-inner">
-        {brandAndHamburger}
-      </div>
-
+      <div className="header-inner">{brandAndHamburger}</div>
       {navOpen && (
         <>
-          <div
-            className="nav-backdrop"
-            onClick={() => onNavToggle(false)}
-            aria-hidden="true"
-          />
+          <div className="nav-backdrop" onClick={() => onNavToggle(false)} aria-hidden="true" />
           <nav className="nav-drawer" role="navigation" aria-label="Main navigation">
             <ul className="nav-list">
-                <li>
-                  <button
-                    type="button"
-                    style={navItemStyle(false)}
-                    onClick={() => { if (typeof onSelectSearch === "function") onSelectSearch(); }}
-                  >
-                    <span role="img" aria-label="Search">🔍</span> Search Notes
-                  </button>
-                </li>
-                <li>
-                  <button
-                    type="button"
-                    style={navItemStyle(activeView === "notes")}
-                    onClick={() => handleNavSelect(onSelectNotes)}
-                >
-                  <span role="img" aria-label="Notes">📋</span> Notes
-                </button>
-              </li>
-              <li>
-                <button
-                  type="button"
-                  style={navItemStyle(activeView === "dashboard")}
-                  onClick={() => handleNavSelect(onSelectDashboard)}
-                >
-                  <span role="img" aria-label="Dashboard">📊</span> Dashboard
-                </button>
-              </li>
-              <li>
-                <button
-                  type="button"
-                  style={navItemStyle(activeView === "deadlines")}
-                  onClick={() => handleNavSelect(onSelectDeadlines)}
-                >
-                  <span role="img" aria-label="Deadlines">📅</span> Deadlines
-                </button>
-              </li>
-              <li>
-                <button
-                  type="button"
-                  style={navItemStyle(activeView === "trash")}
-                  onClick={() => handleNavSelect(onSelectTrash)}
-                >
-                  <span role="img" aria-label="Trash">🗑️</span> Trash
-                </button>
-              </li>
-              <li>
-                <button
-                  type="button"
-                  style={navItemStyle(activeView === "exportImport")}
-                  onClick={() => handleNavSelect(onSelectExportImport)}
-                >
-                  <span role="img" aria-label="Export Import">📤</span> Export / Import
-                </button>
-              </li>
-              <li>
-                <button
-                  type="button"
-                  style={navItemStyle(false)}
-                  onClick={() => handleNavSelect(onSelectSplitView)}
-                >
-                  <span role="img" aria-label="Split view">⬌</span> Split View
-                </button>
-              </li>
-              <li>
-                <button
-                  type="button"
-                  style={navItemStyle(false)}
-                  onClick={() => handleNavSelect(onSelectVoice)}
-                >
-                  <span role="img" aria-label="Voice">🎤</span> Voice
-                </button>
-              </li>
-              <li>
-                <button
-                  type="button"
-                  style={navItemStyle(false)}
-                  onClick={() => handleNavSelect(onSelectDraw)}
-                >
-                  <span role="img" aria-label="Draw">✏️</span> Draw
-                </button>
-              </li>
-              <li>
-                <button
-                  type="button"
-                  style={navItemStyle(false)}
-                  onClick={() => handleNavSelect(onSelectEnhanced)}
-                >
-                  <span role="img" aria-label="Enhanced">＋</span> Enhanced
-                </button>
-              </li>
+              <li><button type="button" style={navItemStyle(false)} onClick={() => { if (typeof onSelectSearch === "function") onSelectSearch(); }}><span role="img" aria-label="Search">🔍</span> Search Notes</button></li>
+              <li><button type="button" style={navItemStyle(activeView === "notes")} onClick={() => handleNavSelect(onSelectNotes)}><span role="img" aria-label="Notes">📋</span> Notes</button></li>
+              <li><button type="button" style={navItemStyle(activeView === "dashboard")} onClick={() => handleNavSelect(onSelectDashboard)}><span role="img" aria-label="Dashboard">📊</span> Dashboard</button></li>
+              <li><button type="button" style={navItemStyle(activeView === "deadlines")} onClick={() => handleNavSelect(onSelectDeadlines)}><span role="img" aria-label="Deadlines">📅</span> Deadlines</button></li>
+              <li><button type="button" style={navItemStyle(activeView === "trash")} onClick={() => handleNavSelect(onSelectTrash)}><span role="img" aria-label="Trash">🗑️</span> Trash</button></li>
+              <li><button type="button" style={navItemStyle(activeView === "exportImport")} onClick={() => handleNavSelect(onSelectExportImport)}><span role="img" aria-label="Export Import">📤</span> Export / Import</button></li>
+              <li><button type="button" style={navItemStyle(false)} onClick={() => handleNavSelect(onSelectSplitView)}><span role="img" aria-label="Split view">⬌</span> Split View</button></li>
+              <li><button type="button" style={navItemStyle(false)} onClick={() => handleNavSelect(onSelectVoice)}><span role="img" aria-label="Voice">🎤</span> Voice</button></li>
+              <li><button type="button" style={navItemStyle(false)} onClick={() => handleNavSelect(onSelectDraw)}><span role="img" aria-label="Draw">✏️</span> Draw</button></li>
+              <li><button type="button" style={navItemStyle(false)} onClick={() => handleNavSelect(onSelectEnhanced)}><span role="img" aria-label="Enhanced">＋</span> Enhanced</button></li>
             </ul>
           </nav>
         </>
