@@ -330,6 +330,15 @@ function App() {
 
   const totalPages = Math.ceil(notes.length / notesPerPage);
 
+  const activeView = showDashboard ? "dashboard" : showDeadlines ? "deadlines" : showTrash ? "trash" : showExportImport ? "exportImport" : "notes";
+
+  const closeAllModals = useCallback(() => {
+    setShowDashboard(false);
+    setShowTrash(false);
+    setShowExportImport(false);
+    setShowDeadlines(false);
+  }, []);
+
   // Group notes by folder (first tag or "Notes" for unfiled)
   const notesByFolder = useMemo(() => {
     const map = new Map();
@@ -473,15 +482,6 @@ function App() {
     setShowDrawing(false);
   }, [addNote]);
 
-  const activeView = showDashboard ? "dashboard" : showDeadlines ? "deadlines" : showTrash ? "trash" : showExportImport ? "exportImport" : "notes";
-
-  const closeAllModals = useCallback(() => {
-    setShowDashboard(false);
-    setShowTrash(false);
-    setShowExportImport(false);
-    setShowDeadlines(false);
-  }, []);
-
   const modalOverlayStyle = {
     position: "fixed",
     inset: 0,
@@ -565,13 +565,13 @@ function App() {
                 {notesByFolder.length === 0 ? (
                   <p className="sidebar-empty-state">{searchQuery ? "No matches" : "No notes yet"}</p>
                 ) : (
-                  <ul className="sidebar-folders" role="list">
+                  <ul className="sidebar-folders">
                     {notesByFolder.map(({ folder, notes: folderNotes }) => (
                       <li key={folder} className="sidebar-folder">
                         <span className="sidebar-folder-name" aria-hidden="true">
                           <span role="img" aria-label="Folder">📁</span> {folder}
                         </span>
-                        <ul className="sidebar-notes-inner" role="list">
+                        <ul className="sidebar-notes-inner">
                           {folderNotes.map((noteItem) => (
                             <li key={noteItem._id}>
                               <button
