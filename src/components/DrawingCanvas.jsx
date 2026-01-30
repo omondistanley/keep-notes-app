@@ -186,7 +186,7 @@ const DrawingCanvas = forwardRef(({ onSave, initialDrawing = null, compact = fal
         padding: compact && !fillContainer ? "8px" : compact && fillContainer ? 0 : "20px",
         background: "var(--bg-secondary)",
         borderRadius: "4px",
-        ...(compact && fillContainer ? { flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" } : {}
+        ...(compact && fillContainer ? { flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" } : {})
       }}
     >
       {toolbar}
