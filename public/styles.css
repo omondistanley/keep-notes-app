@@ -157,18 +157,79 @@ body {
 }
 
 .sidebar-search-wrap {
-  padding: 8px 12px 12px;
+  padding: 10px 12px 12px;
   flex-shrink: 0;
   border-bottom: 1px solid rgba(0, 0, 0, 0.08);
 }
 
-.sidebar-search-wrap input {
+[data-theme="dark"] .sidebar-search-wrap {
+  border-bottom-color: rgba(255, 255, 255, 0.1);
+}
+
+.sidebar-search-input {
   width: 100%;
   padding: 8px 10px;
   font-size: 13px;
   border: 1px solid rgba(0, 0, 0, 0.15);
   border-radius: 6px;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
+  background: rgba(255, 255, 255, 0.5);
+  color: inherit;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.sidebar-search-input::placeholder {
+  color: rgba(0, 0, 0, 0.45);
+}
+
+.sidebar-search-input:focus {
+  outline: none;
+  border-color: rgba(0, 0, 0, 0.35);
+  background: rgba(255, 255, 255, 0.7);
+}
+
+[data-theme="dark"] .sidebar-search-input {
+  background: rgba(0, 0, 0, 0.2);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+[data-theme="dark"] .sidebar-search-input:focus {
+  border-color: rgba(255, 255, 255, 0.4);
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.sidebar-sort-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.sidebar-sort-select {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  font-size: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.5);
+  color: inherit;
+  cursor: pointer;
+}
+
+.sidebar-sort-order-btn {
+  padding: 6px 10px;
+  font-size: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.35);
+  color: inherit;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.sidebar-sort-order-btn:hover {
+  background: rgba(255, 255, 255, 0.5);
 }
 
 .sidebar-notes-label {
@@ -204,19 +265,37 @@ body {
   cursor: pointer;
   font-size: 13px;
   font-family: inherit;
-  transition: background 0.2s ease;
+  transition: background 0.2s ease, box-shadow 0.15s ease;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  border-left: 3px solid transparent;
 }
 
 .sidebar-note-item:hover {
   background: rgba(255, 255, 255, 0.35);
 }
 
+.sidebar-note-item:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.5);
+}
+
 .sidebar-note-item.active {
   background: rgba(255, 255, 255, 0.45);
   font-weight: 600;
+  border-left-color: rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .sidebar-note-item.active {
+  border-left-color: rgba(255, 255, 255, 0.6);
+}
+
+.sidebar-note-item-title {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Sidebar: folders and list structure */

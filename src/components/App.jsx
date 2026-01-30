@@ -529,7 +529,7 @@ function App() {
             onSelectEnhanced={() => { setShowEnhancedForm(true); setSelectedNoteId(null); }}
             onSelectSearch={() => setTimeout(() => searchInputRef.current?.focus(), 0)}
           />
-          {!sidebarCollapsed && navOpen && (
+          {!sidebarCollapsed && (
             <>
               <div className="sidebar-search-wrap">
                 <input
@@ -538,13 +538,15 @@ function App() {
                   placeholder="Search notes..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  style={{ width: "100%", padding: "8px", fontSize: "13px", border: "1px solid rgba(0,0,0,0.15)", borderRadius: "6px", marginBottom: "6px" }}
+                  className="sidebar-search-input"
+                  aria-label="Search notes"
                 />
-                <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }}>
+                <div className="sidebar-sort-row">
                   <select
                     value={sortBy}
                     onChange={(e) => setSortBy(e.target.value)}
-                    style={{ flex: 1, minWidth: "0", padding: "6px", fontSize: "12px", border: "1px solid rgba(0,0,0,0.15)", borderRadius: "6px" }}
+                    className="sidebar-sort-select"
+                    aria-label="Sort by"
                   >
                     <option value="updatedAt">Updated</option>
                     <option value="createdAt">Created</option>
@@ -554,22 +556,26 @@ function App() {
                   <button
                     type="button"
                     onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
-                    style={{ padding: "6px 10px", fontSize: "12px", border: "1px solid rgba(0,0,0,0.15)", borderRadius: "6px", background: "rgba(255,255,255,0.3)", cursor: "pointer" }}
+                    className="sidebar-sort-order-btn"
+                    aria-label={sortOrder === "asc" ? "Sort ascending" : "Sort descending"}
+                    title={sortOrder === "asc" ? "Ascending" : "Descending"}
                   >
                     {sortOrder === "asc" ? "↑" : "↓"}
                   </button>
                 </div>
               </div>
-              <div className="sidebar-notes-label"><span role="img" aria-label="Folder">📁</span> Saved notes</div>
-              <div className="sidebar-notes-list">
+              <div className="sidebar-notes-label">
+                <span role="img" aria-hidden="true">📁</span> Saved notes
+              </div>
+              <div className="sidebar-notes-list" role="navigation" aria-label="Saved notes">
                 {notesByFolder.length === 0 ? (
                   <p className="sidebar-empty-state">{searchQuery ? "No matches" : "No notes yet"}</p>
                 ) : (
                   <ul className="sidebar-folders">
                     {notesByFolder.map(({ folder, notes: folderNotes }) => (
                       <li key={folder} className="sidebar-folder">
-                        <span className="sidebar-folder-name" aria-hidden="true">
-                          <span role="img" aria-label="Folder">📁</span> {folder}
+                        <span className="sidebar-folder-name">
+                          <span role="img" aria-hidden="true">📁</span> {folder}
                         </span>
                         <ul className="sidebar-notes-inner">
                           {folderNotes.map((noteItem) => (
@@ -578,8 +584,10 @@ function App() {
                                 type="button"
                                 className={`sidebar-note-item ${selectedNoteIdForView === noteItem._id ? "active" : ""}`}
                                 onClick={() => handleSidebarNoteClick(noteItem._id)}
+                                aria-label={`Open note: ${noteItem.title || "Untitled"}`}
+                                aria-current={selectedNoteIdForView === noteItem._id ? "true" : undefined}
                               >
-                                {noteItem.title || "Untitled"}
+                                <span className="sidebar-note-item-title">{noteItem.title || "Untitled"}</span>
                               </button>
                             </li>
                           ))}
