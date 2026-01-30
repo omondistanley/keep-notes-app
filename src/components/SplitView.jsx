@@ -201,69 +201,76 @@ const SplitView = ({
           </div>
         )}
 
-        {/* Main content area – framed, fits canvas / add-text / voice */}
+        {/* Main content area – fills entire tab; same area for text and drawing (no separate box) */}
         <div
+          className="split-view-right-content"
           style={{
             flex: 1,
             minHeight: 0,
-            overflow: "auto",
+            overflow: "hidden",
             border: "1px dashed var(--border-color)",
             borderRadius: "6px",
-            margin: "8px",
+            margin: "4px",
             background: "var(--bg-secondary)",
             display: "flex",
             flexDirection: "column"
           }}
         >
-          {showAddText && (
-            <div style={{ padding: "12px", borderBottom: "1px solid var(--border-color)" }}>
+          {showAddText ? (
+            /* Add text uses the same content area – full width/height, no separate box */
+            <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", padding: "12px" }}>
               <textarea
                 value={addText}
                 onChange={(e) => setAddText(e.target.value)}
                 placeholder="Type to append to current note..."
                 disabled={!hasNote}
                 style={{
+                  flex: 1,
+                  minHeight: 0,
                   width: "100%",
-                  minHeight: "70px",
-                  padding: "10px",
-                  fontSize: "13px",
+                  padding: "12px",
+                  fontSize: "14px",
                   border: "1px solid var(--border-color)",
                   borderRadius: "6px",
                   background: "var(--bg-primary)",
                   color: "var(--text-primary)",
-                  resize: "vertical",
-                  marginBottom: "8px"
+                  resize: "none",
+                  boxSizing: "border-box"
                 }}
               />
-              <button
-                type="button"
-                onClick={handleAddTextToNote}
-                disabled={!hasNote || !addText.trim()}
-                style={{ padding: "6px 12px", fontSize: "12px", marginRight: "8px" }}
-              >
-                Add to note
-              </button>
-              <button type="button" onClick={() => setShowAddText(false)} style={{ padding: "6px 12px", fontSize: "12px" }}>
-                Cancel
-              </button>
+              <div style={{ flexShrink: 0, marginTop: "10px", display: "flex", gap: "8px" }}>
+                <button
+                  type="button"
+                  onClick={handleAddTextToNote}
+                  disabled={!hasNote || !addText.trim()}
+                  style={{ padding: "8px 16px", fontSize: "13px" }}
+                >
+                  Add to note
+                </button>
+                <button type="button" onClick={() => setShowAddText(false)} style={{ padding: "8px 16px", fontSize: "13px" }}>
+                  Cancel
+                </button>
+              </div>
             </div>
-          )}
-          {showVoice && (
-            <div style={{ padding: "12px", borderBottom: "1px solid var(--border-color)" }}>
+          ) : showVoice ? (
+            <div style={{ flex: 1, minHeight: 0, overflow: "auto", padding: "12px" }}>
               <VoiceRecorder onTranscript={canAddToNote ? (t) => { onAddVoiceToNote(t); setShowVoice(false); } : undefined} />
             </div>
+          ) : (
+            /* Drawing canvas fills the same content area */
+            <div style={{ flex: 1, minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+              <DrawingCanvas
+                ref={drawingCanvasRef}
+                compact
+                fillContainer
+                onSave={canAddToNote ? onAddDrawingToNote : undefined}
+                color={drawColor}
+                brushSize={drawBrushSize}
+                onColorChange={setDrawColor}
+                onBrushSizeChange={setDrawBrushSize}
+              />
+            </div>
           )}
-          <div style={{ flex: 1, minHeight: 0, overflow: "auto", padding: "8px" }}>
-            <DrawingCanvas
-              ref={drawingCanvasRef}
-              compact
-              onSave={canAddToNote ? onAddDrawingToNote : undefined}
-              color={drawColor}
-              brushSize={drawBrushSize}
-              onColorChange={setDrawColor}
-              onBrushSizeChange={setDrawBrushSize}
-            />
-          </div>
         </div>
 
         {/* Contextual toolbar – single bar, no boxes (Aa, Checklist, Grid, Paperclip, Voice, X) */}

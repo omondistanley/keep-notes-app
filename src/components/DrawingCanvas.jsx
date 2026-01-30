@@ -2,8 +2,9 @@ import React, { useRef, useEffect, useState, forwardRef, useImperativeHandle } f
 
 const PALETTE_COLORS = ["#000000", "#ff0000", "#00ff00", "#0000ff", "#ffff00", "#ff00ff", "#00ffff"];
 
-const DrawingCanvas = forwardRef(({ onSave, initialDrawing = null, compact = false, color: controlledColor, brushSize: controlledBrushSize, onColorChange, onBrushSizeChange }, ref) => {
+const DrawingCanvas = forwardRef(({ onSave, initialDrawing = null, compact = false, fillContainer = false, color: controlledColor, brushSize: controlledBrushSize, onColorChange, onBrushSizeChange }, ref) => {
   const canvasRef = useRef(null);
+  const containerRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [internalColor, setInternalColor] = useState("#000000");
   const [internalBrushSize, setInternalBrushSize] = useState(5);
@@ -15,14 +16,12 @@ const DrawingCanvas = forwardRef(({ onSave, initialDrawing = null, compact = fal
     ? (v) => onBrushSizeChange(typeof v === "number" ? v : parseInt(String(v), 10))
     : setInternalBrushSize;
 
-  useEffect(() => {
+  const initCanvas = (w, h) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-
     const ctx = canvas.getContext("2d");
-    canvas.width = 800;
-    canvas.height = 600;
-
+    canvas.width = w;
+    canvas.height = h;
     if (initialDrawing) {
       const img = new Image();
       img.onload = () => {
@@ -33,7 +32,24 @@ const DrawingCanvas = forwardRef(({ onSave, initialDrawing = null, compact = fal
       ctx.fillStyle = "#ffffff";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
-  }, [initialDrawing]);
+  };
+
+  useEffect(() => {
+    if (compact && fillContainer && containerRef.current) {
+      const container = containerRef.current;
+      const ro = new ResizeObserver(() => {
+        const w = container.clientWidth || 800;
+        const h = container.clientHeight || 600;
+        if (w > 0 && h > 0) initCanvas(w, h);
+      });
+      ro.observe(container);
+      const w = container.clientWidth || 800;
+      const h = container.clientHeight || 600;
+      if (w > 0 && h > 0) initCanvas(w, h);
+      return () => ro.disconnect();
+    }
+    initCanvas(800, 600);
+  }, [initialDrawing, compact, fillContainer]);
 
   const startDrawing = (e) => {
     const canvas = canvasRef.current;
@@ -144,24 +160,43 @@ const DrawingCanvas = forwardRef(({ onSave, initialDrawing = null, compact = fal
     </div>
   );
 
+  const canvasEl = (
+    <canvas
+      ref={canvasRef}
+      onMouseDown={startDrawing}
+      onMouseMove={draw}
+      onMouseUp={stopDrawing}
+      onMouseLeave={stopDrawing}
+      style={{
+        border: compact && fillContainer ? "1px solid var(--border-color)" : "2px solid var(--border-color)",
+        borderRadius: "4px",
+        cursor: "crosshair",
+        background: "#ffffff",
+        display: "block",
+        maxWidth: "100%",
+        ...(compact && fillContainer ? { width: "100%", height: "100%", flex: 1, minHeight: 0 } : {})
+      }}
+    />
+  );
+
   return (
-    <div style={{ padding: compact ? "8px" : "20px", background: "var(--bg-secondary)", borderRadius: "4px" }}>
+    <div
+      ref={fillContainer ? containerRef : undefined}
+      style={{
+        padding: compact && !fillContainer ? "8px" : compact && fillContainer ? 0 : "20px",
+        background: "var(--bg-secondary)",
+        borderRadius: "4px",
+        ...(compact && fillContainer ? { flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" } : {}
+      }}
+    >
       {toolbar}
-      <canvas
-        ref={canvasRef}
-        onMouseDown={startDrawing}
-        onMouseMove={draw}
-        onMouseUp={stopDrawing}
-        onMouseLeave={stopDrawing}
-        style={{
-          border: "2px solid var(--border-color)",
-          borderRadius: "4px",
-          cursor: "crosshair",
-          background: "#ffffff",
-          display: "block",
-          maxWidth: "100%"
-        }}
-      />
+      {compact && fillContainer ? (
+        <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
+          {canvasEl}
+        </div>
+      ) : (
+        canvasEl
+      )}
     </div>
   );
 });
