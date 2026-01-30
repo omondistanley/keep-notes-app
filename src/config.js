@@ -6,6 +6,9 @@ const getApiBase = () => {
   if (typeof process !== "undefined" && process.env?.REACT_APP_API_URL) {
     return process.env.REACT_APP_API_URL.replace(/\/$/, "");
   }
+  if (typeof window !== "undefined" && window.location?.origin) {
+    return window.location.origin;
+  }
   return "http://localhost:3050";
 };
 
