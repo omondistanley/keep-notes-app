@@ -1,7 +1,9 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import Note from "./Note";
 import VoiceRecorder from "./VoiceRecorder";
 import DrawingCanvas from "./DrawingCanvas";
+
+const PALETTE_COLORS = ["#000000", "#ff0000", "#00ff00", "#0000ff", "#ffff00", "#ff00ff", "#00ffff"];
 
 const SplitView = ({
   notes,
@@ -29,6 +31,10 @@ const SplitView = ({
   const [addText, setAddText] = useState("");
   const [showAddText, setShowAddText] = useState(false);
   const [showVoice, setShowVoice] = useState(false);
+  const [showPalette, setShowPalette] = useState(false);
+  const [drawColor, setDrawColor] = useState("#000000");
+  const [drawBrushSize, setDrawBrushSize] = useState(5);
+  const drawingCanvasRef = useRef(null);
 
   const handleMouseDown = () => setIsDragging(true);
   const handleMouseUp = useCallback(() => setIsDragging(false), []);
@@ -126,8 +132,8 @@ const SplitView = ({
             )}
           </div>
         </div>
-        {/* Note opens and fits into this framed area */}
-        <div className="split-view-note-frame" style={{ margin: "8px", marginTop: "0" }}>
+        {/* Note opens and fits into this framed area – fills entire tab */}
+        <div className="split-view-note-frame" style={{ margin: "6px", marginTop: "0" }}>
           {selectedNote ? (
             <Note
               id={selectedNote._id}
@@ -248,11 +254,19 @@ const SplitView = ({
             </div>
           )}
           <div style={{ flex: 1, minHeight: 0, overflow: "auto", padding: "8px" }}>
-            <DrawingCanvas onSave={canAddToNote ? onAddDrawingToNote : undefined} />
+            <DrawingCanvas
+              ref={drawingCanvasRef}
+              compact
+              onSave={canAddToNote ? onAddDrawingToNote : undefined}
+              color={drawColor}
+              brushSize={drawBrushSize}
+              onColorChange={setDrawColor}
+              onBrushSizeChange={setDrawBrushSize}
+            />
           </div>
         </div>
 
-        {/* Contextual toolbar – single bar, no boxes (Aa, Checklist, Grid, Paperclip, Pen, X) */}
+        {/* Contextual toolbar – single bar, no boxes (Aa, Checklist, Grid, Paperclip, Voice, X) */}
         <div className="split-view-toolbar">
           <button
             type="button"
@@ -272,13 +286,13 @@ const SplitView = ({
             title="Checklist"
             aria-label="Checklist"
           >
-            ☑
+            <span role="img" aria-hidden="true">☑</span>
           </button>
           <button type="button" className="split-view-toolbar-btn" disabled title="Table" aria-label="Table">
             ⊞
           </button>
           <button type="button" className="split-view-toolbar-btn" disabled title="Attachment" aria-label="Attachment">
-            📎
+            <span role="img" aria-hidden="true">📎</span>
           </button>
           <button
             type="button"
@@ -288,7 +302,7 @@ const SplitView = ({
             title="Voice"
             aria-label="Voice"
           >
-            🎤
+            <span role="img" aria-hidden="true">🎤</span>
           </button>
           <button
             type="button"
@@ -301,25 +315,90 @@ const SplitView = ({
           </button>
         </div>
 
-        {/* Tool palette – single bar, no boxes (pen, eraser, pencil, ruler, color, +) */}
+        {/* Palette row: color + size (when Palette tab active) */}
+        {showPalette && (
+          <div className="split-view-toolbar" style={{ borderTop: "1px solid var(--border-color)", flexWrap: "wrap", gap: "12px", justifyContent: "center" }}>
+            <span style={{ fontSize: "12px", color: "var(--text-secondary)", marginRight: "4px" }}>Color:</span>
+            {PALETTE_COLORS.map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => setDrawColor(c)}
+                style={{
+                  width: "28px",
+                  height: "28px",
+                  padding: 0,
+                  border: drawColor === c ? "3px solid var(--text-secondary)" : "1px solid var(--border-color)",
+                  borderRadius: "4px",
+                  background: c,
+                  cursor: "pointer"
+                }}
+                aria-label={`Color ${c}`}
+              />
+            ))}
+            <input
+              type="color"
+              value={drawColor}
+              onChange={(e) => setDrawColor(e.target.value)}
+              style={{ width: "32px", height: "28px", cursor: "pointer", verticalAlign: "middle" }}
+              aria-label="Pick color"
+            />
+            <span style={{ fontSize: "12px", color: "var(--text-secondary)", marginLeft: "8px", marginRight: "4px" }}>Size:</span>
+            <input
+              type="range"
+              min="1"
+              max="20"
+              value={drawBrushSize}
+              onChange={(e) => setDrawBrushSize(parseInt(e.target.value, 10))}
+              style={{ width: "80px", verticalAlign: "middle" }}
+              aria-label="Brush size"
+            />
+            <span style={{ fontSize: "12px", color: "var(--text-primary)", marginLeft: "4px" }}>{drawBrushSize}px</span>
+          </div>
+        )}
+
+        {/* Tool palette – single bar (pen, marker, eraser=clear, pencil, ruler, palette=color/size, save, +) */}
         <div className="split-view-toolbar" style={{ borderTop: "1px solid var(--border-color)" }}>
           <button type="button" className="split-view-toolbar-btn" title="Pen" aria-label="Pen">
-            ✒
+            <span role="img" aria-hidden="true">✒</span>
           </button>
           <button type="button" className="split-view-toolbar-btn" title="Marker" aria-label="Marker">
-            🖍
+            <span role="img" aria-hidden="true">🖍</span>
           </button>
-          <button type="button" className="split-view-toolbar-btn" title="Eraser" aria-label="Eraser">
-            🧹
+          <button
+            type="button"
+            className="split-view-toolbar-btn"
+            onClick={() => drawingCanvasRef.current?.clearCanvas()}
+            title="Clear canvas"
+            aria-label="Clear canvas"
+          >
+            <span role="img" aria-hidden="true">🧹</span>
           </button>
           <button type="button" className="split-view-toolbar-btn" title="Pencil" aria-label="Pencil">
-            ✏
+            <span role="img" aria-hidden="true">✏</span>
           </button>
           <button type="button" className="split-view-toolbar-btn" title="Ruler" aria-label="Ruler">
-            📏
+            <span role="img" aria-hidden="true">📏</span>
           </button>
-          <button type="button" className="split-view-toolbar-btn" title="Color" aria-label="Color">
-            🎨
+          <button
+            type="button"
+            className={`split-view-toolbar-btn ${showPalette ? "active" : ""}`}
+            onClick={() => setShowPalette((v) => !v)}
+            title="Color and size"
+            aria-label="Color and size"
+            aria-pressed={showPalette}
+          >
+            <span role="img" aria-hidden="true">🎨</span>
+          </button>
+          <button
+            type="button"
+            className="split-view-toolbar-btn"
+            onClick={() => drawingCanvasRef.current?.saveDrawing()}
+            disabled={!canAddToNote}
+            title="Save drawing to note"
+            aria-label="Save drawing to note"
+          >
+            <span role="img" aria-hidden="true">💾</span>
           </button>
           <button type="button" className="split-view-toolbar-btn" title="More" aria-label="More">
             +

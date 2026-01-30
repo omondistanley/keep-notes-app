@@ -726,6 +726,17 @@ footer p {
   border-radius: 6px;
   background: var(--bg-secondary);
   padding: 12px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Note inside split view frame fills the entire tab/panel */
+.split-view-note-frame .note {
+  width: 100% !important;
+  max-width: none !important;
+  float: none !important;
+  margin: 0 !important;
+  box-sizing: border-box;
 }
 
 /* Split view: single toolbar bar (no boxes per icon) */
@@ -767,6 +778,14 @@ footer p {
 .split-view-toolbar-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.split-view-toolbar-btn.active {
+  background: rgba(0, 0, 0, 0.12);
+}
+
+[data-theme="dark"] .split-view-toolbar-btn.active {
+  background: rgba(255, 255, 255, 0.12);
 }
 
 /* High DPI displays */
