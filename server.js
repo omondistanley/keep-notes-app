@@ -31,8 +31,8 @@ const cron = require("node-cron");
 
 const app = Express();
 
-// Security middleware
-app.use(helmet());
+// Security middleware (disable CSP so CRA inline runtime can load)
+app.use(helmet({ contentSecurityPolicy: false }));
 app.use(cors());
 app.use(Express.json({ limit: "10mb" }));
 
