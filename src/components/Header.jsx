@@ -44,6 +44,9 @@ function Header({
   onNotificationPanelToggle,
   onNotificationsRefresh
 }) {
+  const lastTapRef = useRef(0);
+  const singleTapTimerRef = useRef(null);
+
   const handleNavSelect = (handler) => {
     if (typeof handler === "function") handler();
     onNavToggle(false);
@@ -130,8 +133,6 @@ function Header({
 
   /* Legacy sidebar layout */
   const DOUBLE_TAP_DELAY_MS = 300;
-  const lastTapRef = useRef(0);
-  const singleTapTimerRef = useRef(null);
 
   const handleBrandClick = () => {
     const now = Date.now();
