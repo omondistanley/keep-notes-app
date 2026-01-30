@@ -498,74 +498,79 @@ function App() {
             onSelectVoice={() => { setShowVoiceRecorder(true); setShowDrawing(false); }}
             onSelectDraw={() => { setShowDrawing(true); setShowVoiceRecorder(false); }}
             onSelectEnhanced={() => { setShowEnhancedForm(true); setSelectedNoteId(null); }}
+            onSelectSearch={() => setTimeout(() => searchInputRef.current?.focus(), 0)}
           />
-          <div className="sidebar-search-wrap">
-            <input
-              ref={searchInputRef}
-              type="text"
-              placeholder="Search notes..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              style={{ width: "100%", padding: "8px", fontSize: "13px", border: "1px solid rgba(0,0,0,0.15)", borderRadius: "6px", marginBottom: "6px" }}
-            />
-            <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }}>
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-                style={{ flex: 1, minWidth: "0", padding: "6px", fontSize: "12px", border: "1px solid rgba(0,0,0,0.15)", borderRadius: "6px" }}
-              >
-                <option value="updatedAt">Updated</option>
-                <option value="createdAt">Created</option>
-                <option value="title">Title</option>
-                <option value="priority">Priority</option>
-              </select>
-              <button
-                type="button"
-                onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
-                style={{ padding: "6px 10px", fontSize: "12px", border: "1px solid rgba(0,0,0,0.15)", borderRadius: "6px", background: "rgba(255,255,255,0.3)", cursor: "pointer" }}
-              >
-                {sortOrder === "asc" ? "↑" : "↓"}
-              </button>
-            </div>
-          </div>
-          <div className="sidebar-notes-label"><span role="img" aria-label="Folder">📁</span> Saved notes</div>
-          <div className="sidebar-notes-list">
-            {paginatedNotes.length === 0 ? (
-              <p style={{ padding: "8px 12px", fontSize: "12px", color: "rgba(0,0,0,0.6)", margin: 0 }}>{searchQuery ? "No matches" : "No notes yet"}</p>
-            ) : (
-              paginatedNotes.map((noteItem) => (
-                <button
-                  key={noteItem._id}
-                  type="button"
-                  className={`sidebar-note-item ${selectedNoteIdForView === noteItem._id ? "active" : ""}`}
-                  onClick={() => setSelectedNoteIdForView(noteItem._id)}
-                >
-                  {noteItem.title || "Untitled"}
-                </button>
-              ))
-            )}
-            {totalPages > 1 && (
-              <div style={{ display: "flex", gap: "6px", justifyContent: "center", marginTop: "8px", flexWrap: "wrap" }}>
-                <button
-                  type="button"
-                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                  style={{ padding: "4px 10px", fontSize: "12px", border: "none", borderRadius: "4px", background: "rgba(255,255,255,0.3)", cursor: currentPage === 1 ? "not-allowed" : "pointer" }}
-                >
-                  Prev
-                </button>
-                <span style={{ padding: "4px 8px", fontSize: "12px" }}>{currentPage}/{totalPages}</span>
-                <button
-                  type="button"
-                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={currentPage === totalPages}
-                  style={{ padding: "4px 10px", fontSize: "12px", border: "none", borderRadius: "4px", background: "rgba(255,255,255,0.3)", cursor: currentPage === totalPages ? "not-allowed" : "pointer" }}
-                >
-                  Next
-                </button>
+          {navOpen && (
+            <>
+              <div className="sidebar-search-wrap">
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  placeholder="Search notes..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  style={{ width: "100%", padding: "8px", fontSize: "13px", border: "1px solid rgba(0,0,0,0.15)", borderRadius: "6px", marginBottom: "6px" }}
+                />
+                <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }}>
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value)}
+                    style={{ flex: 1, minWidth: "0", padding: "6px", fontSize: "12px", border: "1px solid rgba(0,0,0,0.15)", borderRadius: "6px" }}
+                  >
+                    <option value="updatedAt">Updated</option>
+                    <option value="createdAt">Created</option>
+                    <option value="title">Title</option>
+                    <option value="priority">Priority</option>
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
+                    style={{ padding: "6px 10px", fontSize: "12px", border: "1px solid rgba(0,0,0,0.15)", borderRadius: "6px", background: "rgba(255,255,255,0.3)", cursor: "pointer" }}
+                  >
+                    {sortOrder === "asc" ? "↑" : "↓"}
+                  </button>
+                </div>
               </div>
-            )}
-          </div>
+              <div className="sidebar-notes-label"><span role="img" aria-label="Folder">📁</span> Saved notes</div>
+              <div className="sidebar-notes-list">
+                {paginatedNotes.length === 0 ? (
+                  <p style={{ padding: "8px 12px", fontSize: "12px", color: "rgba(0,0,0,0.6)", margin: 0 }}>{searchQuery ? "No matches" : "No notes yet"}</p>
+                ) : (
+                  paginatedNotes.map((noteItem) => (
+                    <button
+                      key={noteItem._id}
+                      type="button"
+                      className={`sidebar-note-item ${selectedNoteIdForView === noteItem._id ? "active" : ""}`}
+                      onClick={() => setSelectedNoteIdForView(noteItem._id)}
+                    >
+                      {noteItem.title || "Untitled"}
+                    </button>
+                  ))
+                )}
+                {totalPages > 1 && (
+                  <div style={{ display: "flex", gap: "6px", justifyContent: "center", marginTop: "8px", flexWrap: "wrap" }}>
+                    <button
+                      type="button"
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                      style={{ padding: "4px 10px", fontSize: "12px", border: "none", borderRadius: "4px", background: "rgba(255,255,255,0.3)", cursor: currentPage === 1 ? "not-allowed" : "pointer" }}
+                    >
+                      Prev
+                    </button>
+                    <span style={{ padding: "4px 8px", fontSize: "12px" }}>{currentPage}/{totalPages}</span>
+                    <button
+                      type="button"
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                      style={{ padding: "4px 10px", fontSize: "12px", border: "none", borderRadius: "4px", background: "rgba(255,255,255,0.3)", cursor: currentPage === totalPages ? "not-allowed" : "pointer" }}
+                    >
+                      Next
+                    </button>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </aside>
         <main className="app-main">
           <ThemeToggle />

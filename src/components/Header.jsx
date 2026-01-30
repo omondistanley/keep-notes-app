@@ -29,6 +29,7 @@ function Header({
   onSelectVoice,
   onSelectDraw,
   onSelectEnhanced,
+  onSelectSearch,
   sidebar = false
 }) {
   const handleNavSelect = (handler) => {
@@ -36,9 +37,21 @@ function Header({
     onNavToggle(false);
   };
 
+  const handleReload = () => {
+    window.location.reload();
+  };
+
   const brandAndHamburger = (
     <>
-      <h1 className="header-title sidebar-brand-title">yApSs</h1>
+      <button
+        type="button"
+        className="header-title sidebar-brand-title"
+        onClick={handleReload}
+        style={{ background: "none", border: "none", cursor: "pointer", font: "inherit", padding: 0 }}
+        aria-label="Reload app"
+      >
+        yApSs
+      </button>
       <button
         type="button"
         className="header-hamburger sidebar-hamburger"
@@ -66,6 +79,15 @@ function Header({
             />
             <nav className="nav-drawer" role="navigation" aria-label="Main navigation">
               <ul className="nav-list">
+                <li>
+                  <button
+                    type="button"
+                    style={navItemStyle(false)}
+                    onClick={() => { if (typeof onSelectSearch === "function") onSelectSearch(); }}
+                  >
+                    <span role="img" aria-label="Search">🔍</span> Search Notes
+                  </button>
+                </li>
                 <li>
                   <button
                     type="button"
@@ -170,6 +192,15 @@ function Header({
           />
           <nav className="nav-drawer" role="navigation" aria-label="Main navigation">
             <ul className="nav-list">
+                <li>
+                  <button
+                    type="button"
+                    style={navItemStyle(false)}
+                    onClick={() => { if (typeof onSelectSearch === "function") onSelectSearch(); }}
+                  >
+                    <span role="img" aria-label="Search">🔍</span> Search Notes
+                  </button>
+                </li>
                 <li>
                   <button
                     type="button"
