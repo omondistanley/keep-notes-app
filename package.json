@@ -4,6 +4,9 @@
   "description": "",
   "keywords": [],
   "main": "src/index.js",
+  "engines": {
+    "node": "16.x"
+  },
   "dependencies": {
     "axios": "^1.6.2",
     "dotenv": "^16.3.1",
