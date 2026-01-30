@@ -56,15 +56,33 @@ async function main() {
     console.log("News error:", e.message);
   }
 
-  console.log("\n--- Update financial (crypto - no key) ---");
+  console.log("\n--- Update financial (crypto: BTC, ETH) ---");
   try {
     const finRes = await request("POST", `/api/notes/${noteId}/update-financial`);
-    console.log("Financial updated:", finRes.prices ? finRes.prices.length + " prices" : finRes);
+    console.log("Prices:", finRes.prices ? finRes.prices.length : 0);
+    if (finRes.prices?.length) finRes.prices.forEach((p) => console.log("  ", p.symbol, p.price, p.source));
   } catch (e) {
     console.log("Financial error:", e.message);
   }
 
-  console.log("\n--- Fetch tweets (RSS or mock if no Twitter key) ---");
+  console.log("\n--- Update financial (stocks: AAPL, GOOGL) via second note ---");
+  let stockNoteId;
+  try {
+    const stockNote = await request("POST", "/api/notes/AddNote", {
+      title: "Integration test stocks",
+      content: "Stocks test",
+      tags: ["test"],
+      financial: { enabled: true, type: "stock", symbols: ["AAPL", "GOOGL"] }
+    });
+    stockNoteId = stockNote.id ?? stockNote._id;
+    const finRes = await request("POST", `/api/notes/${stockNoteId}/update-financial`);
+    console.log("Stock prices:", finRes.prices ? finRes.prices.length : 0);
+    if (finRes.prices?.length) finRes.prices.forEach((p) => console.log("  ", p.symbol, p.price, p.source));
+  } catch (e) {
+    console.log("Stocks error:", e.message);
+  }
+
+  console.log("\n--- Fetch tweets (RSS or Twitter API) ---");
   try {
     const tweetsRes = await request("POST", `/api/notes/${noteId}/fetch-tweets`);
     console.log("Tweets count:", tweetsRes.count ?? (tweetsRes.tweets && tweetsRes.tweets.length) ?? 0);

@@ -1,6 +1,5 @@
-import React, { useState, useEffect } from "react";
-
-const API_BASE = "http://localhost:3050";
+import React, { useState, useEffect, useCallback } from "react";
+import { API_BASE } from "../config";
 
 export default function DeadlinesView({ onRefresh }) {
   const [upcoming, setUpcoming] = useState([]);
@@ -9,11 +8,7 @@ export default function DeadlinesView({ onRefresh }) {
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState(null);
 
-  useEffect(() => {
-    fetchDeadlines();
-  }, [days]);
-
-  async function fetchDeadlines() {
+  const fetchDeadlines = useCallback(async () => {
     setLoading(true);
     try {
       const [upRes, overRes] = await Promise.all([
@@ -31,7 +26,11 @@ export default function DeadlinesView({ onRefresh }) {
     } finally {
       setLoading(false);
     }
-  }
+  }, [days]);
+
+  useEffect(() => {
+    fetchDeadlines();
+  }, [fetchDeadlines]);
 
   async function updateDeadlineStatus(noteId, status) {
     setUpdatingId(noteId);

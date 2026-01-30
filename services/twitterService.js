@@ -130,14 +130,28 @@ class TwitterService {
   }
 
   /**
-   * Search: Twitter API (if key) + RSS; merge and dedupe by text
+   * Search: try RSS first (no API key) for real, up-to-date social data;
+   * then Twitter API if configured. Only use mock when both return nothing.
    */
   async searchTweets(keywords, options = {}) {
     const maxResults = options.maxResults || 50;
+    // Try free RSS first (Nitter / Reddit) so we get real data without Twitter API key
+    let fromRss = [];
+    try {
+      fromRss = await this.fetchRssSocial(keywords, maxResults);
+    } catch (e) {
+      console.error("Social RSS (first try):", e.message);
+    }
     const fromTwitter = await this.fetchRealTweets(keywords, maxResults);
-    const fromRss = await this.fetchRssSocial(keywords, maxResults);
     const combined = [];
     const seen = new Set();
+    fromRss.forEach((t) => {
+      const key = (t.text || "").substring(0, 80);
+      if (!seen.has(key)) {
+        seen.add(key);
+        combined.push(t);
+      }
+    });
     if (fromTwitter && fromTwitter.length > 0) {
       fromTwitter.forEach((t) => {
         const key = (t.text || "").substring(0, 80);
@@ -147,13 +161,6 @@ class TwitterService {
         }
       });
     }
-    fromRss.forEach((t) => {
-      const key = (t.text || "").substring(0, 80);
-      if (!seen.has(key)) {
-        seen.add(key);
-        combined.push(t);
-      }
-    });
     combined.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     const tweets = combined.slice(0, maxResults);
     if (tweets.length > 0) {

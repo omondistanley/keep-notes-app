@@ -22,8 +22,7 @@ import EnhancedNoteForm from "./EnhancedNoteForm";
 import DeadlinesView from "./DeadlinesView";
 import useWebSocket from "../hooks/useWebSocket";
 import { useTheme } from "../contexts/ThemeContext";
-
-const API_BASE = "http://localhost:3050";
+import { API_BASE, WS_URL } from "../config";
 
 function App() {
   const { theme, toggleTheme } = useTheme();
@@ -46,6 +45,7 @@ function App() {
   const [showDrawing, setShowDrawing] = useState(false);
   const [showEnhancedForm, setShowEnhancedForm] = useState(false);
   const [selectedNoteId, setSelectedNoteId] = useState(null);
+  const [openNoteModalId, setOpenNoteModalId] = useState(null);
   const [availableTags, setAvailableTags] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [notesPerPage] = useState(20);
@@ -69,8 +69,8 @@ function App() {
       params.append("limit", 20);
 
       const url = searchQuery 
-        ? `http://localhost:3050/api/notes/search?${params.toString()}`
-        : `http://localhost:3050/api/notes/GetNotes?${params.toString()}`;
+        ? `${API_BASE}/api/notes/search?${params.toString()}`
+        : `${API_BASE}/api/notes/GetNotes?${params.toString()}`;
 
       const response = await fetch(url);
 
@@ -87,7 +87,7 @@ function App() {
 
   const fetchTags = useCallback(async () => {
     try {
-      const response = await fetch("http://localhost:3050/api/notes/tags");
+      const response = await fetch(`${API_BASE}/api/notes/tags`);
       if (response.ok) {
         const tags = await response.json();
         setAvailableTags(tags);
@@ -110,7 +110,7 @@ function App() {
     }
   }, [fetchNotes, fetchTags]);
 
-  useWebSocket("ws://localhost:3051", handleWebSocketMessage);
+  useWebSocket(WS_URL, handleWebSocketMessage);
 
   // Command Palette keyboard shortcut
   useEffect(() => {
@@ -176,39 +176,31 @@ function App() {
   }, []);
 
   const fetchNewsForNote = useCallback(async (id) => {
-    try {
-      await fetch(`${API_BASE}/api/notes/${id}/fetch-news`, { method: "POST" });
-      await fetchNotes();
-    } catch (e) {
-      console.error("Error fetching news", e);
-    }
+    const res = await fetch(`${API_BASE}/api/notes/${id}/fetch-news`, { method: "POST" });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.message || "Failed to fetch news");
+    await fetchNotes();
   }, [fetchNotes]);
 
   const fetchTweetsForNote = useCallback(async (id) => {
-    try {
-      await fetch(`${API_BASE}/api/notes/${id}/fetch-tweets`, { method: "POST" });
-      await fetchNotes();
-    } catch (e) {
-      console.error("Error fetching tweets", e);
-    }
+    const res = await fetch(`${API_BASE}/api/notes/${id}/fetch-tweets`, { method: "POST" });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.message || "Failed to fetch tweets");
+    await fetchNotes();
   }, [fetchNotes]);
 
   const updateFinancialForNote = useCallback(async (id) => {
-    try {
-      await fetch(`${API_BASE}/api/notes/${id}/update-financial`, { method: "POST", headers: { "Content-Type": "application/json" } });
-      await fetchNotes();
-    } catch (e) {
-      console.error("Error updating financial", e);
-    }
+    const res = await fetch(`${API_BASE}/api/notes/${id}/update-financial`, { method: "POST", headers: { "Content-Type": "application/json" } });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.message || "Failed to update financial");
+    await fetchNotes();
   }, [fetchNotes]);
 
   const updateAllForNote = useCallback(async (id) => {
-    try {
-      await fetch(`${API_BASE}/api/notes/${id}/update-all`, { method: "POST" });
-      await fetchNotes();
-    } catch (e) {
-      console.error("Error updating all", e);
-    }
+    const res = await fetch(`${API_BASE}/api/notes/${id}/update-all`, { method: "POST" });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.message || "Failed to update all");
+    await fetchNotes();
   }, [fetchNotes]);
 
   // Refetch notes when filters change
@@ -223,7 +215,7 @@ function App() {
    */
   const addNote = useCallback(async (newNote) => {
     try {
-      const response = await fetch("http://localhost:3050/api/notes/AddNote", {
+      const response = await fetch(`${API_BASE}/api/notes/AddNote`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -249,7 +241,7 @@ function App() {
    */
   const updateNote = useCallback(async (id, updateData) => {
     try {
-      const response = await fetch(`http://localhost:3050/api/notes/UpdateNote/${id}`, {
+      const response = await fetch(`${API_BASE}/api/notes/UpdateNote/${id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -276,7 +268,7 @@ function App() {
   // Handle import
   const handleImport = useCallback(async (importedNotes) => {
     try {
-      const response = await fetch("http://localhost:3050/api/notes/import", {
+      const response = await fetch(`${API_BASE}/api/notes/import`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -308,7 +300,7 @@ function App() {
    */
   async function pinNote(id, isPinned) {
     try {
-      const response = await fetch(`http://localhost:3050/api/notes/${id}/pin`, {
+      const response = await fetch(`${API_BASE}/api/notes/${id}/pin`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -329,7 +321,7 @@ function App() {
    */
   async function archiveNote(id, isArchived) {
     try {
-      const response = await fetch(`http://localhost:3050/api/notes/${id}/archive`, {
+      const response = await fetch(`${API_BASE}/api/notes/${id}/archive`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -350,7 +342,7 @@ function App() {
    */
   async function trashNote(id, isDeleted) {
     try {
-      const response = await fetch(`http://localhost:3050/api/notes/${id}/trash`, {
+      const response = await fetch(`${API_BASE}/api/notes/${id}/trash`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -373,7 +365,7 @@ function App() {
    */
   async function deleteNote(id) {
     try {
-      const response = await fetch(`http://localhost:3050/api/notes/DeleteNote/${id}`, {
+      const response = await fetch(`${API_BASE}/api/notes/DeleteNote/${id}`, {
         method: "DELETE",
       });
 
@@ -452,6 +444,7 @@ function App() {
                 social={noteItem.social}
                 attachments={noteItem.attachments}
                 drawings={noteItem.drawings}
+                onOpenModal={() => setOpenNoteModalId(noteItem._id)}
                 onDelete={() => deleteNote(noteItem._id)}
                 onUpdate={updateNote}
                 onPin={pinNote}
@@ -479,6 +472,74 @@ function App() {
           }}
         />
       )}
+
+      {/* Note modal: open note in centered overlay when clicking a note card */}
+      {openNoteModalId && (() => {
+        const modalNote = notes.find(n => n._id === openNoteModalId);
+        if (!modalNote) return null;
+        return (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Note details"
+            onClick={() => setOpenNoteModalId(null)}
+            style={{
+              position: "fixed",
+              inset: 0,
+              background: "rgba(0,0,0,0.5)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              zIndex: 1000,
+              padding: "20px"
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                background: "var(--bg-secondary, #fff)",
+                borderRadius: "8px",
+                boxShadow: "0 4px 20px rgba(0,0,0,0.2)",
+                maxWidth: "560px",
+                width: "100%",
+                maxHeight: "90vh",
+                overflow: "auto",
+                position: "relative"
+              }}
+            >
+              <Note
+                key={modalNote._id}
+                id={modalNote._id}
+                title={modalNote.title}
+                content={modalNote.content}
+                tags={modalNote.tags || []}
+                priority={modalNote.priority}
+                isPinned={modalNote.isPinned}
+                isArchived={modalNote.isArchived}
+                deadline={modalNote.deadline}
+                news={modalNote.news}
+                financial={modalNote.financial}
+                social={modalNote.social}
+                attachments={modalNote.attachments}
+                drawings={modalNote.drawings}
+                isModal
+                onCloseModal={() => setOpenNoteModalId(null)}
+                onDelete={() => { deleteNote(modalNote._id); setOpenNoteModalId(null); }}
+                onUpdate={updateNote}
+                onPin={pinNote}
+                onArchive={archiveNote}
+                onTrash={trashNote}
+                onOpenEnhancedEdit={() => { setOpenNoteModalId(null); openEnhancedFormForNote(modalNote._id); }}
+                onFetchNews={fetchNewsForNote}
+                onFetchTweets={fetchTweetsForNote}
+                onUpdateFinancial={updateFinancialForNote}
+                onUpdateAll={updateAllForNote}
+                onIntegrationComplete={() => { fetchNotes(); }}
+              />
+            </div>
+          </div>
+        );
+      })()}
       
       {showVoiceRecorder && (
         <div style={{ width: "600px", margin: "20px auto" }}>
@@ -824,6 +885,7 @@ function App() {
                     social={noteItem.social}
                     attachments={noteItem.attachments}
                     drawings={noteItem.drawings}
+                    onOpenModal={() => setOpenNoteModalId(noteItem._id)}
                     onDelete={() => deleteNote(noteItem._id)}
                     onUpdate={updateNote}
                     onPin={pinNote}

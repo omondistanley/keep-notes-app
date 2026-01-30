@@ -587,23 +587,33 @@ app.post('/api/notes/:id/fetch-news', async (request, response) => {
   try {
     const id = getIdFromRequest(request);
     const note = await dbService.getNoteById(id);
-    
+
     if (!note) {
       return response.status(404).send({ message: "Note not found" });
     }
-    
+
     const noteData = note.toJSON();
+    const hasNewsConfig = noteData.news && noteData.news.enabled && noteData.news.keywords && noteData.news.keywords.length > 0;
+    if (!hasNewsConfig) {
+      return response.status(400).json({
+        message: "Note has no news keywords. When creating or editing the note, expand Integrations, check News, and add keywords (e.g. technology, AI), then save. Then click Fetch news.",
+        code: "NO_NEWS_CONFIG"
+      });
+    }
+
     const articles = await newsService.fetchNewsForNote(noteData);
-    
+    const sentiment = articles.length > 0 ? intelligenceService.analyzeNewsSentiment(articles) : null;
+
     await dbService.updateNote(id, {
       news: {
         ...noteData.news,
         articles: articles,
+        sentiment: sentiment,
         lastFetched: new Date()
       }
     });
-    
-    response.json({ articles, count: articles.length });
+
+    response.json({ articles, count: articles.length, sentiment });
   } catch (error) {
     console.error("Error fetching news", error);
     response.status(500).send({ message: "Internal Server Error" });
@@ -634,23 +644,33 @@ app.post('/api/notes/:id/update-financial', async (request, response) => {
   try {
     const id = getIdFromRequest(request);
     const note = await dbService.getNoteById(id);
-    
+
     if (!note) {
       return response.status(404).send({ message: "Note not found" });
     }
-    
+
     const noteData = note.toJSON();
+    const hasFinancialConfig = noteData.financial && noteData.financial.enabled && noteData.financial.symbols && noteData.financial.symbols.length > 0;
+    if (!hasFinancialConfig) {
+      return response.status(400).json({
+        message: "Note has no financial symbols. When creating or editing the note, expand Integrations, check Financial, pick type (Crypto/Stocks), and add symbols (e.g. BTC, ETH or AAPL, TSLA), then save. Then click Update financial.",
+        code: "NO_FINANCIAL_CONFIG"
+      });
+    }
+
+    // Default to crypto when type missing so CoinGecko (no API key) is used for BTC, ETH, etc.
+    const financialType = noteData.financial.type || "crypto";
     let prices = [];
-    
-    if (noteData.financial?.type === 'stock' && noteData.financial?.symbols) {
+    if (financialType === "stock" && noteData.financial.symbols) {
       prices = await financialService.fetchStockPrices(noteData.financial.symbols);
-    } else if (noteData.financial?.type === 'crypto' && noteData.financial?.symbols) {
+    } else if (noteData.financial.symbols) {
       prices = await financialService.fetchCryptoPrices(noteData.financial.symbols);
     }
-    
+
     await dbService.updateNote(id, {
       financial: {
         ...noteData.financial,
+        type: financialType,
         data: {
           ...noteData.financial?.data,
           prices: prices
@@ -658,7 +678,7 @@ app.post('/api/notes/:id/update-financial', async (request, response) => {
         lastUpdated: new Date()
       }
     });
-    
+
     response.json({ prices, updatedAt: new Date() });
   } catch (error) {
     console.error("Error updating financial data", error);
@@ -765,11 +785,14 @@ app.post('/api/notes/:id/fetch-tweets', async (request, response) => {
     
     const noteData = note.toJSON();
     const keywords = noteData.social?.x?.keywords || [];
-    
+
     if (keywords.length === 0) {
-      return response.json({ tweets: [], sentiment: null });
+      return response.status(400).json({
+        message: "Note has no X/social keywords. When creating or editing the note, expand Integrations, check X / Social keywords, and add keywords (e.g. crypto, tech), then save. Then click Fetch tweets.",
+        code: "NO_SOCIAL_CONFIG"
+      });
     }
-    
+
     const tweetData = await twitterService.searchTweets(keywords, { maxResults: 50 });
     const sentiment = twitterService.analyzeSentiment(tweetData.tweets);
     
@@ -891,9 +914,11 @@ app.post('/api/notes/:id/update-all', async (request, response) => {
     // Update news
     if (noteData.news?.enabled) {
       const articles = await newsService.fetchNewsForNote(noteData);
+      const newsSentiment = articles.length > 0 ? intelligenceService.analyzeNewsSentiment(articles) : null;
       updates.news = {
         ...noteData.news,
         articles: articles,
+        sentiment: newsSentiment,
         lastFetched: new Date()
       };
     }

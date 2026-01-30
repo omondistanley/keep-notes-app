@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { API_BASE } from "../config";
 
 const TemplateSelector = ({ onSelectTemplate }) => {
   const [templates, setTemplates] = useState([]);
@@ -10,7 +11,7 @@ const TemplateSelector = ({ onSelectTemplate }) => {
 
   async function fetchTemplates() {
     try {
-      const response = await fetch("http://localhost:3050/api/templates");
+      const response = await fetch(`${API_BASE}/api/templates`);
       if (response.ok) {
         const data = await response.json();
         setTemplates(data);

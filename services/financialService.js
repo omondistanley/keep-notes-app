@@ -1,13 +1,15 @@
 /**
  * Financial Service
- * Handles stock and crypto data from multiple free sources:
- * - Alpha Vantage (ALPHA_VANTAGE_API_KEY) - stocks, 25 req/day free
- * - Finnhub (FINNHUB_API_KEY) - stocks, 60/min free
- * - CoinGecko - crypto, no key for basic use
- * Falls back to mock data when no keys / rate limits.
+ * Real data only for stocks (NYSE, NASDAQ, major exchanges) and crypto.
+ * - Yahoo Finance (no API key) - stocks, first choice for major exchanges
+ * - Alpha Vantage (ALPHA_VANTAGE_API_KEY) - stocks fallback
+ * - Finnhub (FINNHUB_API_KEY) - stocks fallback
+ * - CoinGecko - crypto, no key
+ * Pulled data is cached (see cacheService). No mock/dummy data for stocks.
  */
 
 const axios = require("axios");
+const cacheService = require("./cacheService");
 
 // Common crypto symbol -> CoinGecko id
 const CRYPTO_IDS = {
@@ -72,6 +74,56 @@ class FinancialService {
         }
       } catch (err) {
         console.error("Alpha Vantage error for", symbol, err.message);
+      }
+    }
+    return results.length ? results : null;
+  }
+
+  /**
+   * Yahoo Finance public chart API - stocks (no API key), NYSE, NASDAQ, major exchanges
+   * Uses query1.finance.yahoo.com/v8/finance/chart for current price and change.
+   */
+  async fetchYahooChartStocks(symbols) {
+    if (!symbols.length) return null;
+    const results = [];
+    const syms = symbols.slice(0, 15).map((s) => String(s).trim().toUpperCase()).filter(Boolean);
+    for (const symbol of syms) {
+      try {
+        const res = await axios.get(
+          `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}`,
+          {
+            params: { interval: "1d", range: "5d" },
+            timeout: 10000,
+            headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" }
+          }
+        );
+        const chartResult = res.data?.chart?.result?.[0];
+        if (!chartResult) continue;
+        const meta = chartResult.meta || {};
+        const price = meta.regularMarketPrice;
+        const prevClose = meta.previousClose ?? meta.chartPreviousClose ?? price;
+        if (typeof price !== "number" || !Number.isFinite(price)) continue;
+        const change = typeof prevClose === "number" ? price - prevClose : 0;
+        const changePercent = prevClose && prevClose !== 0 ? (change / prevClose) * 100 : 0;
+        const quote = chartResult.indicators?.quote?.[0];
+        const closes = quote?.close?.filter((c) => c != null) || [];
+        const highs = quote?.high?.filter((h) => h != null) || [];
+        const lows = quote?.low?.filter((l) => l != null) || [];
+        const vols = quote?.volume?.filter((v) => v != null) || [];
+        results.push({
+          symbol: (meta.symbol || symbol).toUpperCase(),
+          price,
+          change: Number(change.toFixed(4)),
+          changePercent: Number(changePercent.toFixed(2)),
+          volume: meta.regularMarketVolume ?? (vols.length ? vols[vols.length - 1] : 0),
+          high: highs.length ? Math.max(...highs) : price,
+          low: lows.length ? Math.min(...lows) : price,
+          timestamp: new Date(),
+          source: "Yahoo Finance"
+        });
+        await new Promise((resolve) => setTimeout(resolve, 150));
+      } catch (err) {
+        console.error("Yahoo Finance chart error for", symbol, err.message);
       }
     }
     return results.length ? results : null;
@@ -163,9 +215,12 @@ class FinancialService {
   }
 
   /**
-   * Stocks: try Alpha Vantage, then Finnhub
+   * Stocks: try Yahoo (no key, major exchanges), then Alpha Vantage, then Finnhub.
+   * Returns only real data; no mock.
    */
   async fetchRealStockPrices(symbols) {
+    const yahoo = await this.fetchYahooChartStocks(symbols);
+    if (yahoo && yahoo.length > 0) return yahoo;
     const alpha = await this.fetchAlphaVantageStocks(symbols);
     if (alpha && alpha.length > 0) return alpha;
     const finn = await this.fetchFinnhubStocks(symbols);
@@ -211,16 +266,34 @@ class FinancialService {
     };
   }
 
+  /**
+   * Fetch stock prices: check cache first (TTL 5 min), then real APIs only. No mock data.
+   */
   async fetchStockPrices(symbols) {
+    const key = `stock:${symbols.map((s) => String(s).trim().toUpperCase()).sort().join(",")}`;
+    const cached = cacheService.getFinancial(key);
+    if (cached && Array.isArray(cached) && cached.length > 0) return cached;
     const real = await this.fetchRealStockPrices(symbols);
-    if (real && real.length > 0) return real;
-    return symbols.map((s) => this.generateMockStockPrice(s));
+    if (real && real.length > 0) {
+      cacheService.setFinancial(key, real);
+      return real;
+    }
+    return [];
   }
 
+  /**
+   * Fetch crypto prices: check cache first (TTL 5 min), then CoinGecko. No mock data.
+   */
   async fetchCryptoPrices(symbols) {
+    const key = `crypto:${symbols.map((s) => String(s).trim().toUpperCase()).sort().join(",")}`;
+    const cached = cacheService.getFinancial(key);
+    if (cached && Array.isArray(cached) && cached.length > 0) return cached;
     const real = await this.fetchRealCryptoPrices(symbols);
-    if (real && real.length > 0) return real;
-    return symbols.map((s) => this.generateMockCryptoPrice(s));
+    if (real && real.length > 0) {
+      cacheService.setFinancial(key, real);
+      return real;
+    }
+    return [];
   }
 
   calculatePortfolioPerformance(holdings, currentPrices) {

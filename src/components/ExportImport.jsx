@@ -1,6 +1,5 @@
 import React, { useState } from "react";
-
-const API_BASE = "http://localhost:3050";
+import { API_BASE } from "../config";
 
 const ExportImport = ({ notes, onImport }) => {
   const [importFile, setImportFile] = useState(null);

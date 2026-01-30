@@ -1,16 +1,14 @@
 /**
  * News Service
- * Fetches news from multiple free sources:
- * - GNews (GNEWS_API_KEY)
- * - The Guardian (GUARDIAN_API_KEY)
- * - New York Times (NYT_API_KEY)
- * - NewsAPI.org (NEWS_API_KEY) - optional
- * - Google News RSS (no key)
- * Uses mock data when no keys are set.
+ * Fetches real news from multiple sources; pulled data is cached (see cacheService).
+ * - Google News RSS (no key), tried first
+ * - GNews, Guardian, NYT, NewsAPI when keys are set
+ * Only real articles are cached and returned; no mock/dummy data.
  */
 
 const axios = require("axios");
 const Parser = require("rss-parser");
+const cacheService = require("./cacheService");
 const rssParser = new Parser({
   timeout: 8000,
   headers: { "User-Agent": "KeepNotesApp/1.0 (News aggregator)" }
@@ -199,17 +197,27 @@ class NewsService {
   }
 
   /**
-   * Fetch from all configured sources and merge (dedupe by URL, sort by date)
+   * Fetch from all configured sources and merge (dedupe by URL, sort by date).
+   * Tries Google News RSS first (no API key) so we get real, up-to-date news
+   * even when no paid API keys are set.
    */
   async fetchRealNews(keywords, count = 10) {
-    const all = await Promise.all([
+    // Try free RSS first for current data without any API key
+    let rssArticles = [];
+    try {
+      rssArticles = await this.fetchNewsRss(keywords, count);
+    } catch (e) {
+      console.error("News RSS (first try):", e.message);
+    }
+    // In parallel try any configured API sources
+    const [gNews, guardian, nyt, newsApi] = await Promise.all([
       this.fetchGNews(keywords, count),
       this.fetchGuardian(keywords, count),
       this.fetchNYT(keywords, count),
-      this.fetchNewsAPI(keywords, count),
-      this.fetchNewsRss(keywords, count)
+      this.fetchNewsAPI(keywords, count)
     ]);
-    const merged = dedupeByUrl(all.flat());
+    const all = [rssArticles, gNews, guardian, nyt, newsApi].flat();
+    const merged = dedupeByUrl(all);
     merged.sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt));
     return merged.slice(0, count);
   }
@@ -239,14 +247,19 @@ class NewsService {
     if (!note.news || !note.news.enabled || !note.news.keywords || note.news.keywords.length === 0) {
       return [];
     }
+    const keywords = note.news.keywords.slice().sort();
+    const cacheKey = `news:${keywords.join(",")}`;
+    const cached = cacheService.getNews(cacheKey);
+    if (cached && Array.isArray(cached) && cached.length > 0) return cached;
     const realArticles = await this.fetchRealNews(note.news.keywords, 10);
-    const articles = realArticles.length > 0 ? realArticles : this.generateMockArticles(note.news.keywords, 10);
-    return articles
+    const articles = realArticles
       .map((article) => ({
         ...article,
         relevance: typeof article.relevance === "number" ? article.relevance : this.calculateRelevance(article, note.news.keywords)
       }))
       .sort((a, b) => b.relevance - a.relevance);
+    if (articles.length > 0) cacheService.setNews(cacheKey, articles);
+    return articles;
   }
 
   calculateRelevance(article, keywords) {
@@ -261,8 +274,12 @@ class NewsService {
   }
 
   async fetchNews(keywords, sources = []) {
+    const key = `news:${keywords.slice().sort().join(",")}`;
+    const cached = cacheService.getNews(key);
+    if (cached && Array.isArray(cached) && cached.length > 0) return cached;
     const real = await this.fetchRealNews(keywords, 10);
-    return real.length > 0 ? real : this.generateMockArticles(keywords, 10);
+    if (real.length > 0) cacheService.setNews(key, real);
+    return real;
   }
 }
 

@@ -30,6 +30,9 @@ const EnhancedNoteForm = ({ note = null, onSave, onCancel }) => {
 
   const [activeTab, setActiveTab] = useState("basic");
   const [tagInput, setTagInput] = useState("");
+  const [newsKeywordInput, setNewsKeywordInput] = useState("");
+  const [financialSymbolInput, setFinancialSymbolInput] = useState("");
+  const [socialKeywordInput, setSocialKeywordInput] = useState("");
   const [deadlineDate, setDeadlineDate] = useState(
     note?.deadline?.date ? new Date(note.deadline.date) : null
   );
@@ -49,11 +52,16 @@ const EnhancedNoteForm = ({ note = null, onSave, onCancel }) => {
     }
   };
 
+  const MAX_TAGS = 50;
+
   const handleTagAdd = () => {
-    if (tagInput.trim() && !formData.tags.includes(tagInput.trim())) {
+    const v = tagInput.trim();
+    if (!v) return;
+    const toAdd = v.split(",").map(t => t.trim()).filter(Boolean).filter(t => !formData.tags.includes(t));
+    if (toAdd.length && formData.tags.length < MAX_TAGS) {
       setFormData(prev => ({
         ...prev,
-        tags: [...prev.tags, tagInput.trim()]
+        tags: [...prev.tags, ...toAdd].slice(0, MAX_TAGS)
       }));
       setTagInput("");
     }
@@ -88,6 +96,7 @@ const EnhancedNoteForm = ({ note = null, onSave, onCancel }) => {
         {["basic", "deadline", "news", "financial", "social"].map(tab => (
           <button
             key={tab}
+            type="button"
             onClick={() => setActiveTab(tab)}
             style={{
               padding: "12px 20px",
@@ -139,44 +148,38 @@ const EnhancedNoteForm = ({ note = null, onSave, onCancel }) => {
               }}
             />
             <div style={{ marginBottom: "10px" }}>
-              <input
-                type="text"
-                placeholder="Add tag"
-                value={tagInput}
-                onChange={(e) => setTagInput(e.target.value)}
-                onKeyPress={(e) => e.key === "Enter" && handleTagAdd()}
-                style={{
-                  padding: "8px",
-                  border: "1px solid var(--border-color)",
-                  borderRadius: "4px",
-                  background: "var(--bg-tertiary)",
-                  color: "var(--text-primary)"
-                }}
-              />
-              <button onClick={handleTagAdd} style={{ marginLeft: "5px", padding: "8px 12px" }}>
-                Add
-              </button>
-            </div>
-            <div style={{ display: "flex", gap: "5px", flexWrap: "wrap", marginBottom: "10px" }}>
-              {formData.tags.map((tag, i) => (
-                <span
-                  key={i}
-                  onClick={() => setFormData(prev => ({
-                    ...prev,
-                    tags: prev.tags.filter(t => t !== tag)
-                  }))}
-                  style={{
-                    padding: "4px 8px",
-                    background: "#f5ba13",
-                    color: "white",
-                    borderRadius: "12px",
-                    fontSize: "12px",
-                    cursor: "pointer"
-                  }}
-                >
-                  {tag} ×
-                </span>
-              ))}
+              <span style={{ fontSize: "12px", fontWeight: "bold", marginBottom: "6px", display: "block" }}>Tags</span>
+              {formData.tags.length > 0 && (
+                <ol style={{ margin: "6px 0", paddingLeft: "20px", fontSize: "12px" }}>
+                  {formData.tags.map((tag, i) => (
+                    <li key={i} style={{ marginBottom: "4px", display: "flex", alignItems: "center", gap: "6px" }}>
+                      <span>{tag}</span>
+                      <button type="button" onClick={() => setFormData(prev => ({ ...prev, tags: prev.tags.filter((_, idx) => idx !== i) }))} style={{ background: "none", border: "none", cursor: "pointer", color: "#c62828", fontSize: "14px" }} aria-label="Remove">×</button>
+                    </li>
+                  ))}
+                </ol>
+              )}
+              {formData.tags.length < MAX_TAGS && (
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "6px" }}>
+                  <input
+                    type="text"
+                    placeholder="Add one or more tags (comma-separated)"
+                    value={tagInput}
+                    onChange={(e) => setTagInput(e.target.value)}
+                    onKeyPress={(e) => e.key === "Enter" && handleTagAdd()}
+                    style={{
+                      flex: 1,
+                      padding: "8px",
+                      border: "1px solid var(--border-color)",
+                      borderRadius: "4px",
+                      background: "var(--bg-tertiary)",
+                      color: "var(--text-primary)"
+                    }}
+                  />
+                  <button type="button" onClick={handleTagAdd} style={{ padding: "8px 12px" }}>Add</button>
+                </div>
+              )}
+              <span style={{ fontSize: "12px", color: "var(--text-secondary, #666)", marginTop: "4px", display: "block" }}>{formData.tags.length} / {MAX_TAGS} tags</span>
             </div>
             <select
               value={formData.priority}
@@ -225,20 +228,30 @@ const EnhancedNoteForm = ({ note = null, onSave, onCancel }) => {
             </label>
             {formData.news.enabled && (
               <div>
-                <input
-                  type="text"
-                  placeholder="Enter keywords (comma-separated)"
-                  value={formData.news.keywords.join(", ")}
-                  onChange={(e) => handleChange("news.keywords", e.target.value.split(",").map(k => k.trim()).filter(k => k))}
-                  style={{
-                    width: "100%",
-                    padding: "10px",
-                    border: "1px solid var(--border-color)",
-                    borderRadius: "4px",
-                    background: "var(--bg-tertiary)",
-                    color: "var(--text-primary)"
-                  }}
-                />
+                {formData.news.keywords.length > 0 && (
+                  <ol style={{ margin: "6px 0", paddingLeft: "20px", fontSize: "12px" }}>
+                    {formData.news.keywords.map((k, i) => (
+                      <li key={i} style={{ marginBottom: "4px", display: "flex", alignItems: "center", gap: "6px" }}>
+                        <span>{k}</span>
+                        <button type="button" onClick={() => handleChange("news.keywords", formData.news.keywords.filter((_, idx) => idx !== i))} style={{ background: "none", border: "none", cursor: "pointer", color: "#c62828", fontSize: "14px" }} aria-label="Remove">×</button>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+                {formData.news.keywords.length < 50 && (
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "6px" }}>
+                    <input
+                      type="text"
+                      placeholder="Add keyword(s), comma-separated"
+                      value={newsKeywordInput}
+                      onChange={(e) => setNewsKeywordInput(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); const v = newsKeywordInput.trim(); if (v) { const toAdd = v.split(",").map(x => x.trim()).filter(Boolean).filter(x => !formData.news.keywords.includes(x)); handleChange("news.keywords", [...formData.news.keywords, ...toAdd].slice(0, 50)); setNewsKeywordInput(""); } } }}
+                      style={{ flex: 1, padding: "10px", border: "1px solid var(--border-color)", borderRadius: "4px", background: "var(--bg-tertiary)", color: "var(--text-primary)" }}
+                    />
+                    <button type="button" onClick={() => { const v = newsKeywordInput.trim(); if (v) { const toAdd = v.split(",").map(x => x.trim()).filter(Boolean).filter(x => !formData.news.keywords.includes(x)); handleChange("news.keywords", [...formData.news.keywords, ...toAdd].slice(0, 50)); setNewsKeywordInput(""); } }} style={{ padding: "8px 12px" }}>Add</button>
+                  </div>
+                )}
+                <span style={{ fontSize: "12px", color: "var(--text-secondary, #666)", marginTop: "4px", display: "block" }}>{formData.news.keywords.length} / 50 keywords</span>
               </div>
             )}
           </div>
@@ -274,20 +287,30 @@ const EnhancedNoteForm = ({ note = null, onSave, onCancel }) => {
                   <option value="crypto">Cryptocurrency</option>
                   <option value="predictive">Predictive Markets</option>
                 </select>
-                <input
-                  type="text"
-                  placeholder="Symbols (comma-separated, e.g., AAPL,TSLA or BTC,ETH)"
-                  value={formData.financial.symbols.join(",")}
-                  onChange={(e) => handleChange("financial.symbols", e.target.value.split(",").map(s => s.trim().toUpperCase()).filter(s => s))}
-                  style={{
-                    width: "100%",
-                    padding: "10px",
-                    border: "1px solid var(--border-color)",
-                    borderRadius: "4px",
-                    background: "var(--bg-tertiary)",
-                    color: "var(--text-primary)"
-                  }}
-                />
+                {formData.financial.symbols.length > 0 && (
+                  <ol style={{ margin: "6px 0", paddingLeft: "20px", fontSize: "12px" }}>
+                    {formData.financial.symbols.map((s, i) => (
+                      <li key={i} style={{ marginBottom: "4px", display: "flex", alignItems: "center", gap: "6px" }}>
+                        <span>{s}</span>
+                        <button type="button" onClick={() => handleChange("financial.symbols", formData.financial.symbols.filter((_, idx) => idx !== i))} style={{ background: "none", border: "none", cursor: "pointer", color: "#c62828", fontSize: "14px" }} aria-label="Remove">×</button>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+                {formData.financial.symbols.length < 50 && (
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "6px" }}>
+                    <input
+                      type="text"
+                      placeholder="Add symbol(s), comma-separated (e.g. AAPL, TSLA or BTC, ETH)"
+                      value={financialSymbolInput}
+                      onChange={(e) => setFinancialSymbolInput(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); const v = financialSymbolInput.trim(); if (v) { const toAdd = v.split(",").map(x => x.trim().toUpperCase()).filter(Boolean).filter(x => !formData.financial.symbols.includes(x)); handleChange("financial.symbols", [...formData.financial.symbols, ...toAdd].slice(0, 50)); setFinancialSymbolInput(""); } } }}
+                      style={{ flex: 1, padding: "10px", border: "1px solid var(--border-color)", borderRadius: "4px", background: "var(--bg-tertiary)", color: "var(--text-primary)" }}
+                    />
+                    <button type="button" onClick={() => { const v = financialSymbolInput.trim(); if (v) { const toAdd = v.split(",").map(x => x.trim().toUpperCase()).filter(Boolean).filter(x => !formData.financial.symbols.includes(x)); handleChange("financial.symbols", [...formData.financial.symbols, ...toAdd].slice(0, 50)); setFinancialSymbolInput(""); } }} style={{ padding: "8px 12px" }}>Add</button>
+                  </div>
+                )}
+                <span style={{ fontSize: "12px", color: "var(--text-secondary, #666)", marginTop: "4px", display: "block" }}>{formData.financial.symbols.length} / 50 symbols</span>
               </div>
             )}
           </div>
@@ -306,20 +329,30 @@ const EnhancedNoteForm = ({ note = null, onSave, onCancel }) => {
             </label>
             {formData.social.x.enabled && (
               <div>
-                <input
-                  type="text"
-                  placeholder="Keywords to track (comma-separated)"
-                  value={formData.social.x.keywords.join(", ")}
-                  onChange={(e) => handleChange("social.x.keywords", e.target.value.split(",").map(k => k.trim()).filter(k => k))}
-                  style={{
-                    width: "100%",
-                    padding: "10px",
-                    border: "1px solid var(--border-color)",
-                    borderRadius: "4px",
-                    background: "var(--bg-tertiary)",
-                    color: "var(--text-primary)"
-                  }}
-                />
+                {formData.social.x.keywords.length > 0 && (
+                  <ol style={{ margin: "6px 0", paddingLeft: "20px", fontSize: "12px" }}>
+                    {formData.social.x.keywords.map((k, i) => (
+                      <li key={i} style={{ marginBottom: "4px", display: "flex", alignItems: "center", gap: "6px" }}>
+                        <span>{k}</span>
+                        <button type="button" onClick={() => handleChange("social.x.keywords", formData.social.x.keywords.filter((_, idx) => idx !== i))} style={{ background: "none", border: "none", cursor: "pointer", color: "#c62828", fontSize: "14px" }} aria-label="Remove">×</button>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+                {formData.social.x.keywords.length < 50 && (
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "6px" }}>
+                    <input
+                      type="text"
+                      placeholder="Add keyword(s), comma-separated (e.g. crypto, tech)"
+                      value={socialKeywordInput}
+                      onChange={(e) => setSocialKeywordInput(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); const v = socialKeywordInput.trim(); if (v) { const toAdd = v.split(",").map(x => x.trim()).filter(Boolean).filter(x => !formData.social.x.keywords.includes(x)); handleChange("social.x.keywords", [...formData.social.x.keywords, ...toAdd].slice(0, 50)); setSocialKeywordInput(""); } } }}
+                      style={{ flex: 1, padding: "10px", border: "1px solid var(--border-color)", borderRadius: "4px", background: "var(--bg-tertiary)", color: "var(--text-primary)" }}
+                    />
+                    <button type="button" onClick={() => { const v = socialKeywordInput.trim(); if (v) { const toAdd = v.split(",").map(x => x.trim()).filter(Boolean).filter(x => !formData.social.x.keywords.includes(x)); handleChange("social.x.keywords", [...formData.social.x.keywords, ...toAdd].slice(0, 50)); setSocialKeywordInput(""); } }} style={{ padding: "8px 12px" }}>Add</button>
+                  </div>
+                )}
+                <span style={{ fontSize: "12px", color: "var(--text-secondary, #666)", marginTop: "4px", display: "block" }}>{formData.social.x.keywords.length} / 50 keywords</span>
               </div>
             )}
           </div>
@@ -329,6 +362,7 @@ const EnhancedNoteForm = ({ note = null, onSave, onCancel }) => {
       {/* Actions */}
       <div style={{ padding: "15px", borderTop: "1px solid var(--border-color)", display: "flex", justifyContent: "flex-end", gap: "10px" }}>
         <button
+          type="button"
           onClick={onCancel}
           style={{
             padding: "8px 16px",
@@ -342,6 +376,7 @@ const EnhancedNoteForm = ({ note = null, onSave, onCancel }) => {
           Cancel
         </button>
         <button
+          type="button"
           onClick={handleSubmit}
           style={{
             padding: "8px 16px",

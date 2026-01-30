@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import Note from "./Note";
+import { API_BASE } from "../config";
 
 const TrashView = ({ onRestore, onDeletePermanent }) => {
   const [trashedNotes, setTrashedNotes] = useState([]);
@@ -10,7 +11,7 @@ const TrashView = ({ onRestore, onDeletePermanent }) => {
 
   async function fetchTrashedNotes() {
     try {
-      const response = await fetch("http://localhost:3050/api/notes/trash");
+      const response = await fetch(`${API_BASE}/api/notes/trash`);
       if (response.ok) {
         const notes = await response.json();
         setTrashedNotes(notes);
@@ -22,7 +23,7 @@ const TrashView = ({ onRestore, onDeletePermanent }) => {
 
   async function handleRestore(id) {
     try {
-      const response = await fetch(`http://localhost:3050/api/notes/${id}/trash`, {
+      const response = await fetch(`${API_BASE}/api/notes/${id}/trash`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -42,7 +43,7 @@ const TrashView = ({ onRestore, onDeletePermanent }) => {
   async function handleDeletePermanent(id) {
     if (window.confirm("Are you sure you want to permanently delete this note? This action cannot be undone.")) {
       try {
-        const response = await fetch(`http://localhost:3050/api/notes/DeleteNote/${id}`, {
+        const response = await fetch(`${API_BASE}/api/notes/DeleteNote/${id}`, {
           method: "DELETE",
         });
 
@@ -61,7 +62,7 @@ const TrashView = ({ onRestore, onDeletePermanent }) => {
       try {
         await Promise.all(
           trashedNotes.map(note =>
-            fetch(`http://localhost:3050/api/notes/DeleteNote/${note._id}`, {
+            fetch(`${API_BASE}/api/notes/DeleteNote/${note._id}`, {
               method: "DELETE",
             })
           )

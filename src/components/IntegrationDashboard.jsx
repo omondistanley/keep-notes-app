@@ -8,6 +8,7 @@ import {
   ResponsiveContainer,
   Cell
 } from "recharts";
+import { API_BASE } from "../config";
 
 const IntegrationDashboard = () => {
   const [stats, setStats] = useState({
@@ -30,9 +31,9 @@ const IntegrationDashboard = () => {
   async function fetchStats() {
     try {
       const [allNotes, archived, trashed] = await Promise.all([
-        fetch("http://localhost:3050/api/notes/GetNotes").then(r => r.json()),
-        fetch("http://localhost:3050/api/notes/archived").then(r => r.json()),
-        fetch("http://localhost:3050/api/notes/trash").then(r => r.json())
+        fetch(`${API_BASE}/api/notes/GetNotes`).then(r => r.json()),
+        fetch(`${API_BASE}/api/notes/archived`).then(r => r.json()),
+        fetch(`${API_BASE}/api/notes/trash`).then(r => r.json())
       ]);
 
       const pinned = allNotes.filter(n => n.isPinned).length;
