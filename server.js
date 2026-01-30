@@ -608,19 +608,25 @@ app.post('/api/notes/:id/fetch-news', async (request, response) => {
       });
     }
 
-    const articles = await newsService.fetchNewsForNote(noteData);
+    const articles = await newsService.fetchNewsForNote(noteData, 25);
     const sentiment = articles.length > 0 ? intelligenceService.analyzeNewsSentiment(articles) : null;
+    const summary = newsService.summarizeArticlesForNote(articles, {
+      title: noteData.title,
+      content: noteData.content,
+      keywords: noteData.news?.keywords || []
+    });
 
     await dbService.updateNote(id, {
       news: {
         ...noteData.news,
         articles: articles,
         sentiment: sentiment,
+        summary: summary || undefined,
         lastFetched: new Date()
       }
     });
 
-    response.json({ articles, count: articles.length, sentiment });
+    response.json({ articles, count: articles.length, sentiment, summary });
   } catch (error) {
     console.error("Error fetching news", error);
     response.status(500).send({ message: "Internal Server Error" });
@@ -668,8 +674,20 @@ app.post('/api/notes/:id/update-financial', async (request, response) => {
     // Default to crypto when type missing so CoinGecko (no API key) is used for BTC, ETH, etc.
     const financialType = noteData.financial.type || "crypto";
     let prices = [];
+    let topMovers = null;
+    let indexes = [];
     if (financialType === "stock" && noteData.financial.symbols) {
       prices = await financialService.fetchStockPrices(noteData.financial.symbols);
+      try {
+        topMovers = await financialService.fetchTopMoversForNote(noteData, 100);
+      } catch (e) {
+        console.error("Error fetching top movers for note:", e.message);
+      }
+      try {
+        indexes = await financialService.fetchMajorIndexes();
+      } catch (e) {
+        console.error("Error fetching major indexes:", e.message);
+      }
     } else if (noteData.financial.symbols) {
       prices = await financialService.fetchCryptoPrices(noteData.financial.symbols);
     }
@@ -680,13 +698,23 @@ app.post('/api/notes/:id/update-financial', async (request, response) => {
         type: financialType,
         data: {
           ...noteData.financial?.data,
-          prices: prices
+          prices: prices,
+          ...(topMovers && {
+            topGainers: topMovers.topGainers,
+            topLosers: topMovers.topLosers,
+            largestMovers: topMovers.largestMovers
+          }),
+          ...(indexes.length > 0 && { indexes })
         },
         lastUpdated: new Date()
       }
     });
 
-    response.json({ prices, updatedAt: new Date() });
+    response.json({
+      prices,
+      updatedAt: new Date(),
+      ...(topMovers && { topGainers: topMovers.topGainers, topLosers: topMovers.topLosers, largestMovers: topMovers.largestMovers })
+    });
   } catch (error) {
     console.error("Error updating financial data", error);
     response.status(500).send({ message: "Internal Server Error" });
@@ -706,10 +734,49 @@ app.get('/api/notes/:id/financial-summary', async (request, response) => {
     response.json({
       type: noteData.financial?.type,
       lastUpdated: noteData.financial?.lastUpdated,
-      prices: noteData.financial?.data?.prices || []
+      prices: noteData.financial?.data?.prices || [],
+      topGainers: noteData.financial?.data?.topGainers || [],
+      topLosers: noteData.financial?.data?.topLosers || [],
+      largestMovers: noteData.financial?.data?.largestMovers || [],
+      indexes: noteData.financial?.data?.indexes || []
     });
   } catch (error) {
     console.error("Error getting financial summary", error);
+    response.status(500).send({ message: "Internal Server Error" });
+  }
+});
+
+/**
+ * Top movers: fetch up to 100 gainers/losers/movers tied to note content and news; save to note when type is stock.
+ */
+app.get('/api/notes/:id/top-movers', async (request, response) => {
+  try {
+    const id = getIdFromRequest(request);
+    const note = await dbService.getNoteById(id);
+    if (!note) {
+      return response.status(404).send({ message: "Note not found" });
+    }
+    const noteData = note.toJSON();
+    const financialType = noteData.financial?.type || "stock";
+    const topMovers = await financialService.fetchTopMoversForNote(noteData, 100);
+    if (financialType === "stock") {
+      await dbService.updateNote(id, {
+        financial: {
+          ...noteData.financial,
+          type: financialType,
+          data: {
+            ...noteData.financial?.data,
+            topGainers: topMovers.topGainers,
+            topLosers: topMovers.topLosers,
+            largestMovers: topMovers.largestMovers
+          },
+          lastUpdated: new Date()
+        }
+      });
+    }
+    response.json(topMovers);
+  } catch (error) {
+    console.error("Error fetching top movers", error);
     response.status(500).send({ message: "Internal Server Error" });
   }
 });
@@ -779,45 +846,67 @@ app.post('/api/notes/:id/link-predictive-market', async (request, response) => {
 });
 
 /**
- * Twitter/X endpoints
+ * Social (X, Reddit) endpoints – fetch from all enabled platforms
  */
 app.post('/api/notes/:id/fetch-tweets', async (request, response) => {
   try {
     const id = getIdFromRequest(request);
     const note = await dbService.getNoteById(id);
-    
+
     if (!note) {
       return response.status(404).send({ message: "Note not found" });
     }
-    
-    const noteData = note.toJSON();
-    const keywords = noteData.social?.x?.keywords || [];
 
-    if (keywords.length === 0) {
+    const noteData = note.toJSON();
+    const social = noteData.social || {};
+    const xKeywords = Array.isArray(social.x?.keywords) ? social.x.keywords : [];
+    const redditKeywords = Array.isArray(social.reddit?.keywords) ? social.reddit.keywords : xKeywords;
+    const xEnabled = (social.x?.enabled !== false) && xKeywords.length > 0;
+    const redditEnabled = social.reddit?.enabled === true && redditKeywords.length > 0;
+
+    if (!xEnabled && !redditEnabled) {
       return response.status(400).json({
-        message: "Note has no X/social keywords. When creating or editing the note, expand Integrations, check X / Social keywords, and add keywords (e.g. crypto, tech), then save. Then click Fetch tweets.",
+        message: "Note has no social keywords. In Integrations → Social, enable X and/or Reddit and add keywords (e.g. crypto, tech), then save. Then click Fetch social.",
         code: "NO_SOCIAL_CONFIG"
       });
     }
 
-    const tweetData = await twitterService.searchTweets(keywords, { maxResults: 50 });
-    const sentiment = twitterService.analyzeSentiment(tweetData.tweets);
-    
-    await dbService.updateNote(id, {
-      social: {
-        ...noteData.social,
-        x: {
-          ...noteData.social?.x,
-          tweets: tweetData.tweets,
-          sentiment: sentiment,
-          lastFetched: new Date()
-        }
-      }
+    const updates = { ...social };
+    let xResult = { tweets: [], sentiment: null };
+    let redditResult = { posts: [], sentiment: null };
+
+    if (xEnabled) {
+      xResult = await twitterService.searchTweets(xKeywords, { maxResults: 50 });
+      updates.x = {
+        ...(social.x || {}),
+        enabled: true,
+        keywords: xKeywords,
+        tweets: xResult.tweets || [],
+        sentiment: xResult.sentiment || twitterService.analyzeSentiment(xResult.tweets || []),
+        lastFetched: new Date()
+      };
+    } else if (social.x) updates.x = { ...social.x, tweets: social.x.tweets || [], sentiment: social.x.sentiment || null };
+
+    if (redditEnabled) {
+      redditResult = await twitterService.searchReddit(redditKeywords, { maxResults: 30 });
+      updates.reddit = {
+        ...(social.reddit || {}),
+        enabled: true,
+        keywords: redditKeywords,
+        posts: redditResult.posts || [],
+        sentiment: redditResult.sentiment || null,
+        lastFetched: new Date()
+      };
+    } else if (social.reddit) updates.reddit = { ...social.reddit, posts: social.reddit.posts || [], sentiment: social.reddit.sentiment || null };
+
+    await dbService.updateNote(id, { social: updates });
+
+    response.json({
+      x: { tweets: updates.x?.tweets || [], sentiment: updates.x?.sentiment },
+      reddit: { posts: updates.reddit?.posts || [], sentiment: updates.reddit?.sentiment }
     });
-    
-    response.json({ tweets: tweetData.tweets, sentiment });
   } catch (error) {
-    console.error("Error fetching tweets", error);
+    console.error("Error fetching social", error);
     response.status(500).send({ message: "Internal Server Error" });
   }
 });
@@ -947,20 +1036,31 @@ app.post('/api/notes/:id/update-all', async (request, response) => {
       }
     }
     
-    // Update Twitter
-    if (noteData.social?.x?.enabled) {
-      const keywords = noteData.social.x.keywords || [];
-      if (keywords.length > 0) {
-        const tweetData = await twitterService.searchTweets(keywords);
-        const sentiment = twitterService.analyzeSentiment(tweetData.tweets);
-        updates.social = {
-          ...noteData.social,
-          x: {
-            ...noteData.social.x,
-            tweets: tweetData.tweets,
-            sentiment: sentiment,
-            lastFetched: new Date()
-          }
+    // Update social (X + Reddit)
+    const social = noteData.social || {};
+    const xEnabled = social.x?.enabled && (social.x?.keywords?.length > 0);
+    const redditEnabled = social.reddit?.enabled && (social.reddit?.keywords?.length || social.x?.keywords?.length > 0);
+    if (xEnabled || redditEnabled) {
+      updates.social = { ...noteData.social };
+      if (xEnabled) {
+        const xResult = await twitterService.searchTweets(social.x.keywords, { maxResults: 50 });
+        updates.social.x = {
+          ...social.x,
+          tweets: xResult.tweets || [],
+          sentiment: xResult.sentiment || twitterService.analyzeSentiment(xResult.tweets || []),
+          lastFetched: new Date()
+        };
+      }
+      if (redditEnabled) {
+        const redditKeywords = social.reddit?.keywords?.length ? social.reddit.keywords : social.x?.keywords || [];
+        const redditResult = await twitterService.searchReddit(redditKeywords, { maxResults: 30 });
+        updates.social.reddit = {
+          ...(social.reddit || {}),
+          enabled: true,
+          keywords: redditKeywords,
+          posts: redditResult.posts || [],
+          sentiment: redditResult.sentiment || null,
+          lastFetched: new Date()
         };
       }
     }

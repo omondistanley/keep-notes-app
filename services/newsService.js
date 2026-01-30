@@ -243,15 +243,50 @@ class NewsService {
     return articles.sort((a, b) => b.relevance - a.relevance);
   }
 
-  async fetchNewsForNote(note) {
+  /**
+   * Build a short extractive summary from top articles tied to the note's subject (keywords + title).
+   * Uses up to 25 articles; summary is 2–4 sentences from titles and snippets.
+   */
+  summarizeArticlesForNote(articles, noteContext = {}) {
+    const top = (articles || []).slice(0, 25);
+    if (top.length === 0) return "";
+    const keywords = noteContext.keywords || [];
+    const noteTitle = (noteContext.title || "").trim();
+    const parts = [];
+    if (noteTitle || keywords.length) {
+      const subject = noteTitle || keywords.slice(0, 5).join(", ");
+      parts.push(`Based on recent coverage related to "${subject}":`);
+    }
+    const sentences = [];
+    const seen = new Set();
+    for (const a of top) {
+      const title = (a.title || "").trim();
+      const snippet = (a.snippet || "").trim().slice(0, 120);
+      if (title && !seen.has(title)) {
+        seen.add(title);
+        if (snippet) {
+          sentences.push(`${title} — ${snippet}${snippet.length >= 120 ? "…" : ""}`);
+        } else {
+          sentences.push(title);
+        }
+        if (sentences.length >= 5) break;
+      }
+    }
+    if (sentences.length === 0) return parts.join(" ") || "No summary available.";
+    const summaryBody = sentences.slice(0, 4).join(" ");
+    const full = (parts.join(" ") + " " + summaryBody).trim();
+    return full.slice(0, 600) + (full.length > 600 ? "…" : "");
+  }
+
+  async fetchNewsForNote(note, count = 25) {
     if (!note.news || !note.news.enabled || !note.news.keywords || note.news.keywords.length === 0) {
       return [];
     }
     const keywords = note.news.keywords.slice().sort();
-    const cacheKey = `news:${keywords.join(",")}`;
+    const cacheKey = `news:${keywords.join(",")}:${count}`;
     const cached = cacheService.getNews(cacheKey);
     if (cached && Array.isArray(cached) && cached.length > 0) return cached;
-    const realArticles = await this.fetchRealNews(note.news.keywords, 10);
+    const realArticles = await this.fetchRealNews(note.news.keywords, count);
     const articles = realArticles
       .map((article) => ({
         ...article,

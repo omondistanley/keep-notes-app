@@ -11,6 +11,45 @@
 const axios = require("axios");
 const cacheService = require("./cacheService");
 
+/** Major market indexes (US + sector ETFs). Fetched and displayed in Financial modal. */
+const MAJOR_INDEXES = [
+  { symbol: "SPY", name: "S&P 500" },
+  { symbol: "QQQ", name: "NASDAQ 100" },
+  { symbol: "DIA", name: "Dow Jones" },
+  { symbol: "IWM", name: "Russell 2000" },
+  { symbol: "VTI", name: "Total US Market" },
+  { symbol: "XLF", name: "Financials" },
+  { symbol: "XLK", name: "Technology" },
+  { symbol: "XLE", name: "Energy" },
+  { symbol: "XLV", name: "Healthcare" },
+  { symbol: "XLI", name: "Industrials" },
+  { symbol: "XLP", name: "Consumer Staples" },
+  { symbol: "XLY", name: "Consumer Discretionary" },
+  { symbol: "XLU", name: "Utilities" },
+  { symbol: "XLB", name: "Materials" },
+  { symbol: "XLRE", name: "Real Estate" },
+  { symbol: "EFA", name: "Developed ex-US" },
+  { symbol: "EEM", name: "Emerging Markets" },
+  { symbol: "VNQ", name: "Real Estate (Vanguard)" },
+  { symbol: "BND", name: "Total Bond" }
+];
+
+const MAJOR_INDEX_SYMBOLS = MAJOR_INDEXES.map((i) => i.symbol);
+
+/** Curated universe for top 100 gainers/losers/movers (S&P 100–style + tech + major indexes). */
+const TOP_MOVERS_UNIVERSE = [
+  ...MAJOR_INDEX_SYMBOLS,
+  "AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "BRK.B", "TSLA", "JPM", "V", "UNH", "JNJ", "WMT", "PG", "XOM",
+  "HD", "MA", "CVX", "ABBV", "MRK", "PEP", "KO", "COST", "AVGO", "LLY", "MCD", "DHR", "ABT", "TMO", "ACN",
+  "NEE", "WFC", "DIS", "PM", "CSCO", "ADBE", "CRM", "VZ", "NKE", "CMCSA", "TXN", "INTC", "AMD", "QCOM", "T",
+  "ORCL", "AMGN", "HON", "INTU", "AMAT", "IBM", "SBUX", "LOW", "AXP", "BKNG", "GE", "CAT", "DE", "MDLZ",
+  "GILD", "ADI", "LMT", "SYK", "BLK", "C", "BA", "PLD", "REGN", "MMC", "ISRG", "VRTX", "MO", "ZTS", "CI",
+  "SO", "DUK", "BDX", "BSX", "EOG", "SLB", "EQIX", "CL", "MCK", "CB", "APD", "SHW", "MDT", "WM", "APTV",
+  "KLAC", "SNPS", "CDNS", "MAR", "PSA", "ITW", "APTV", "ETN", "HCA", "CME", "PANW", "MU", "NXPI", "AON",
+  "SPGI", "ICE", "SO", "FIS", "USB", "PGR", "BDX", "CMG", "ECL", "AIG", "MMC", "AFL", "NOC", "FCX", "EMR",
+  "COF", "IT", "MNST", "PSX", "GS", "MS", "RTX", "CARR", "ORLY", "PCAR", "AJG", "MET", "AEP", "GM", "F"
+];
+
 // Common crypto symbol -> CoinGecko id
 const CRYPTO_IDS = {
   btc: "bitcoin",
@@ -264,6 +303,169 @@ class FinancialService {
       volume: Math.floor(Math.random() * 5000000000),
       timestamp: new Date()
     };
+  }
+
+  /**
+   * Alpha Vantage TOP_GAINERS_LOSERS - returns top 20 gainers, 20 losers, 20 most actively traded (US).
+   */
+  async fetchTopGainersLosersAlphaVantage() {
+    const apiKey = process.env.ALPHA_VANTAGE_API_KEY;
+    if (!apiKey) return null;
+    try {
+      const res = await axios.get("https://www.alphavantage.co/query", {
+        params: { function: "TOP_GAINERS_LOSERS", apikey: apiKey },
+        timeout: 12000
+      });
+      const topGainers = (res.data && res.data.top_gainers) || [];
+      const topLosers = (res.data && res.data.top_losers) || [];
+      const mostActive = (res.data && res.data.most_actively_traded) || [];
+      const toPrice = (item) => ({
+        symbol: (item.ticker || item.symbol || "").toUpperCase(),
+        price: parseFloat(item.price) || 0,
+        change: parseFloat(item.change_amount) || 0,
+        changePercent: parseFloat(String(item.change_percentage || "0").replace("%", "")) || 0,
+        volume: parseInt(item.volume, 10) || 0,
+        timestamp: new Date(),
+        source: "Alpha Vantage"
+      });
+      return {
+        topGainers: topGainers.map(toPrice).filter((p) => p.symbol),
+        topLosers: topLosers.map(toPrice).filter((p) => p.symbol),
+        largestMovers: mostActive.map(toPrice).filter((p) => p.symbol)
+      };
+    } catch (err) {
+      console.error("Alpha Vantage TOP_GAINERS_LOSERS error:", err.message);
+      return null;
+    }
+  }
+
+  /**
+   * Score 0–1: how closely a stock (symbol/name) ties to the note content and attached news.
+   * Used to prefer "relevant to your note" in top gainers/losers/movers.
+   */
+  scoreRelevanceToNote(priceItem, note = {}, news = {}) {
+    const text = [
+      (note.title || "").trim(),
+      (note.content || "").trim().slice(0, 2000),
+      (note.tags || []).join(" "),
+      (note.news?.keywords || []).join(" "),
+      ...((news.articles || []).map((a) => (a.title || "") + " " + (a.snippet || "")).slice(0, 25))
+    ].join(" ").toLowerCase();
+    const symbol = (priceItem.symbol || "").toUpperCase();
+    const name = (priceItem.name || "").toLowerCase();
+    let score = 0;
+    if (symbol && text.includes(symbol.toLowerCase())) score += 0.5;
+    if (name && text.includes(name)) score += 0.4;
+    const tickerInText = new RegExp("\\b" + symbol.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\b", "i");
+    if (symbol && tickerInText.test(text)) score = Math.max(score, 0.6);
+    const sectorBoosts = [
+      { words: ["nvidia", "nvda", "gpu", "ai chip", "semiconductor"], symbols: ["NVDA", "AMD", "INTC", "QCOM", "AVGO"] },
+      { words: ["apple", "aapl", "iphone", "mac"], symbols: ["AAPL"] },
+      { words: ["tesla", "tsla", "ev", "electric vehicle"], symbols: ["TSLA", "RIVN", "LCID", "GM", "F"] },
+      { words: ["microsoft", "msft", "azure", "cloud"], symbols: ["MSFT", "AMZN", "GOOGL"] },
+      { words: ["amazon", "amzn", "aws", "retail"], symbols: ["AMZN"] },
+      { words: ["google", "goog", "alphabet", "search"], symbols: ["GOOGL"] },
+      { words: ["meta", "facebook", "fb", "instagram"], symbols: ["META"] },
+      { words: ["oil", "energy", "exxon", "chevron"], symbols: ["XOM", "CVX", "COP", "EOG"] },
+      { words: ["bank", "jpm", "finance", "interest rate"], symbols: ["JPM", "BAC", "WFC", "C", "GS", "MS"] }
+    ];
+    for (const { words, symbols } of sectorBoosts) {
+      if (words.some((w) => text.includes(w)) && symbols.includes(symbol)) score = Math.max(score, 0.7);
+    }
+    return Math.min(score, 1);
+  }
+
+  /**
+   * Fetch top 100 gainers, losers, and largest movers from a curated universe; score by relevance to note + news.
+   * Prefer Alpha Vantage TOP_GAINERS_LOSERS when key is set (20 each); otherwise fetch universe via Yahoo and sort.
+   */
+  async fetchTopMoversForNote(note, limit = 100) {
+    const noteData = typeof note === "object" && note !== null ? note : {};
+    const news = noteData.news || {};
+    const userSymbols = new Set((noteData.financial?.symbols || []).map((s) => String(s).trim().toUpperCase()).filter(Boolean));
+
+    let topGainers = [];
+    let topLosers = [];
+    let largestMovers = [];
+
+    const av = await this.fetchTopGainersLosersAlphaVantage();
+    if (av && (av.topGainers.length || av.topLosers.length || av.largestMovers.length)) {
+      const score = (p) => ({ ...p, relevanceScore: this.scoreRelevanceToNote(p, noteData, news), inUserList: userSymbols.has((p.symbol || "").toUpperCase()) });
+      topGainers = av.topGainers.slice(0, 20).map(score);
+      topLosers = av.topLosers.slice(0, 20).map(score);
+      largestMovers = av.largestMovers.slice(0, 20).map(score);
+    }
+
+    const cacheKey = "top_movers:universe";
+    let universePrices = cacheService.getFinancial(cacheKey);
+    if (!universePrices || !Array.isArray(universePrices) || universePrices.length < 50) {
+      const unique = [...new Set(TOP_MOVERS_UNIVERSE)].slice(0, 120);
+      universePrices = await this.fetchRealStockPrices(unique);
+      if (universePrices && universePrices.length > 0) {
+        cacheService.setFinancial(cacheKey, universePrices);
+      }
+    }
+    if (universePrices && universePrices.length > 0) {
+      const withRelevance = universePrices.map((p) => ({
+        ...p,
+        relevanceScore: this.scoreRelevanceToNote(p, noteData, news),
+        inUserList: userSymbols.has((p.symbol || "").toUpperCase())
+      }));
+      const byGain = [...withRelevance].sort((a, b) => (Number(b.changePercent) ?? 0) - (Number(a.changePercent) ?? 0));
+      const byLoss = [...withRelevance].sort((a, b) => (Number(a.changePercent) ?? 0) - (Number(b.changePercent) ?? 0));
+      const byMove = [...withRelevance].sort((a, b) => Math.abs(Number(b.changePercent) ?? 0) - Math.abs(Number(a.changePercent) ?? 0));
+      const merge = (existing, fromUniverse, cap) => {
+        const seen = new Set((existing || []).map((p) => p.symbol));
+        const out = [...(existing || [])];
+        for (const p of fromUniverse) {
+          if (out.length >= cap) break;
+          if (!seen.has(p.symbol)) {
+            seen.add(p.symbol);
+            out.push(p);
+          }
+        }
+        return out.slice(0, cap);
+      };
+      topGainers = merge(topGainers, byGain, limit);
+      topLosers = merge(topLosers, byLoss, limit);
+      largestMovers = merge(largestMovers, byMove, limit);
+    }
+
+    const sortRelevanceFirst = (arr) =>
+      [...arr].sort((a, b) => {
+        const ra = a.relevanceScore ?? 0;
+        const rb = b.relevanceScore ?? 0;
+        if (Math.abs(ra - rb) > 0.01) return rb - ra;
+        const inA = a.inUserList ? 1 : 0;
+        const inB = b.inUserList ? 1 : 0;
+        if (inA !== inB) return inB - inA;
+        return (Number(b.changePercent) ?? 0) - (Number(a.changePercent) ?? 0);
+      });
+
+    return {
+      topGainers: sortRelevanceFirst(topGainers).slice(0, limit).map((p) => ({ ...p, relevanceScore: p.relevanceScore ?? 0 })),
+      topLosers: sortRelevanceFirst(topLosers).slice(0, limit).map((p) => ({ ...p, relevanceScore: p.relevanceScore ?? 0 })),
+      largestMovers: sortRelevanceFirst(largestMovers).slice(0, limit).map((p) => ({ ...p, relevanceScore: p.relevanceScore ?? 0 }))
+    };
+  }
+
+  /**
+   * Fetch prices for major indexes (SPY, QQQ, sector ETFs, etc.). Cached 5 min.
+   */
+  async fetchMajorIndexes() {
+    const key = "financial:major_indexes";
+    const cached = cacheService.getFinancial(key);
+    if (cached && Array.isArray(cached) && cached.length > 0) return cached;
+    const prices = await this.fetchRealStockPrices(MAJOR_INDEX_SYMBOLS);
+    if (prices && prices.length > 0) {
+      const withNames = prices.map((p) => {
+        const info = MAJOR_INDEXES.find((i) => i.symbol === (p.symbol || "").toUpperCase());
+        return { ...p, name: info?.name || p.symbol };
+      });
+      cacheService.setFinancial(key, withNames);
+      return withNames;
+    }
+    return [];
   }
 
   /**

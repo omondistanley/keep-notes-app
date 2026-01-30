@@ -48,6 +48,8 @@ function App() {
   const [openNoteModalId, setOpenNoteModalId] = useState(null);
   const [openNewsModalNoteId, setOpenNewsModalNoteId] = useState(null);
   const [openFinancialModalNoteId, setOpenFinancialModalNoteId] = useState(null);
+  const [navOpen, setNavOpen] = useState(false);
+  const [topMoversLoadingId, setTopMoversLoadingId] = useState(null);
   const [availableTags, setAvailableTags] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [notesPerPage] = useState(20);
@@ -415,9 +417,53 @@ function App() {
     setShowDrawing(false);
   }, [addNote]);
 
+  const activeView = showDashboard ? "dashboard" : showDeadlines ? "deadlines" : showTrash ? "trash" : showExportImport ? "exportImport" : "notes";
+
+  const closeAllModals = useCallback(() => {
+    setShowDashboard(false);
+    setShowTrash(false);
+    setShowExportImport(false);
+    setShowDeadlines(false);
+  }, []);
+
+  const modalOverlayStyle = {
+    position: "fixed",
+    inset: 0,
+    background: "rgba(0,0,0,0.5)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 1000,
+    padding: "20px"
+  };
+  const modalContentStyle = {
+    background: "var(--bg-secondary, #fff)",
+    borderRadius: "8px",
+    boxShadow: "0 4px 20px rgba(0,0,0,0.2)",
+    maxWidth: "min(900px, 95vw)",
+    width: "100%",
+    maxHeight: "90vh",
+    overflow: "auto",
+    position: "relative",
+    padding: "16px"
+  };
+
   return (
     <div style={{ background: theme === "dark" ? "#1a1a1a" : "#eee", minHeight: "100vh", paddingBottom: "60px" }}>
-      <Header />
+      <Header
+        navOpen={navOpen}
+        onNavToggle={setNavOpen}
+        activeView={activeView}
+        onSelectNotes={() => { closeAllModals(); setNavOpen(false); }}
+        onSelectDashboard={() => { setShowTrash(false); setShowExportImport(false); setShowDeadlines(false); setShowDashboard(true); }}
+        onSelectDeadlines={() => { setShowDashboard(false); setShowTrash(false); setShowExportImport(false); setShowDeadlines(true); }}
+        onSelectTrash={() => { setShowDashboard(false); setShowExportImport(false); setShowDeadlines(false); setShowTrash(true); }}
+        onSelectExportImport={() => { setShowTrash(false); setShowDashboard(false); setShowDeadlines(false); setShowExportImport(true); }}
+        onSelectSplitView={() => { setShowSplitView(true); }}
+        onSelectVoice={() => { setShowVoiceRecorder(true); setShowDrawing(false); }}
+        onSelectDraw={() => { setShowDrawing(true); setShowVoiceRecorder(false); }}
+        onSelectEnhanced={() => { setShowEnhancedForm(true); setSelectedNoteId(null); }}
+      />
       <ThemeToggle />
       
       <CommandPalette
@@ -548,18 +594,19 @@ function App() {
         );
       })()}
 
-      {/* News modal: full articles + summary for selected note */}
+      {/* News modal: subject-tied summary from top 25 articles + full article list */}
       {openNewsModalNoteId && (() => {
         const note = notes.find(n => n._id === openNewsModalNoteId);
         if (!note) return null;
         const articles = (note.news?.articles && Array.isArray(note.news.articles)) ? note.news.articles : [];
         const keywords = note.news?.keywords || [];
-        const summaryParts = [
+        const subjectSummary = note.news?.summary;
+        const fallbackSummary = [
           note.title?.trim(),
           (note.content || "").trim().slice(0, 200),
           keywords.length ? `Topics: ${keywords.slice(0, 8).join(", ")}` : ""
-        ].filter(Boolean);
-        const summary = summaryParts.join(" · ") + (summaryParts.join("").length > 250 ? "…" : "");
+        ].filter(Boolean).join(" · ");
+        const displaySummary = subjectSummary || (fallbackSummary + (fallbackSummary.length > 250 ? "…" : "")) || "No summary.";
         return (
           <div
             role="dialog"
@@ -595,18 +642,28 @@ function App() {
                 <button type="button" onClick={() => setOpenNewsModalNoteId(null)} style={{ padding: "6px 12px", background: "#666", color: "#fff", border: "none", borderRadius: "4px", cursor: "pointer" }}>Close</button>
               </div>
               <div style={{ padding: "16px" }}>
-                <p style={{ fontSize: "13px", color: "var(--text-secondary, #555)", marginBottom: "16px", fontStyle: "italic" }}>{summary || "No summary."}</p>
-                {articles.length === 0 ? (
-                  <p style={{ color: "var(--text-secondary, #666)" }}>No articles yet. Use &quot;Fetch news&quot; on the note.</p>
+                {subjectSummary ? (
+                  <div style={{ marginBottom: "16px", padding: "12px", background: "var(--bg-tertiary, #f5f5f5)", borderRadius: "6px", borderLeft: "4px solid #1976d2" }}>
+                    <strong style={{ fontSize: "12px", color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.5px" }}>Summary from top {Math.min(articles.length, 25)} articles (tied to this note)</strong>
+                    <p style={{ fontSize: "14px", color: "var(--text-primary)", margin: "8px 0 0", lineHeight: 1.5 }}>{displaySummary}</p>
+                  </div>
                 ) : (
-                  <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-                    {articles.map((a, i) => (
-                      <li key={i} style={{ marginBottom: "12px", paddingBottom: "12px", borderBottom: "1px solid #eee" }}>
-                        <a href={a.url || a.link || "#"} target="_blank" rel="noopener noreferrer" style={{ color: "#1976d2", fontWeight: "bold" }}>{a.title || a.snippet || "Untitled"}</a>
-                        {a.snippet && a.title && <p style={{ margin: "4px 0 0", fontSize: "12px", color: "var(--text-secondary)" }}>{a.snippet}</p>}
-                      </li>
-                    ))}
-                  </ul>
+                  <p style={{ fontSize: "13px", color: "var(--text-secondary, #555)", marginBottom: "16px", fontStyle: "italic" }}>{displaySummary}</p>
+                )}
+                {articles.length === 0 ? (
+                  <p style={{ color: "var(--text-secondary, #666)" }}>No articles yet. Use &quot;Fetch news&quot; on the note to load up to 25 articles and generate a subject summary.</p>
+                ) : (
+                  <>
+                    <p style={{ fontSize: "12px", color: "var(--text-secondary)", marginBottom: "12px" }}>{articles.length} article{articles.length !== 1 ? "s" : ""} below.</p>
+                    <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+                      {articles.map((a, i) => (
+                        <li key={i} style={{ marginBottom: "12px", paddingBottom: "12px", borderBottom: "1px solid #eee" }}>
+                          <a href={a.url || a.link || "#"} target="_blank" rel="noopener noreferrer" style={{ color: "#1976d2", fontWeight: "bold" }}>{a.title || a.snippet || "Untitled"}</a>
+                          {a.snippet && a.title && <p style={{ margin: "4px 0 0", fontSize: "12px", color: "var(--text-secondary)" }}>{a.snippet}</p>}
+                        </li>
+                      ))}
+                    </ul>
+                  </>
                 )}
               </div>
             </div>
@@ -614,17 +671,30 @@ function App() {
         );
       })()}
 
-      {/* Financial modal: all symbols, top gainers, largest movers */}
+      {/* Financial modal: top 100 gainers/losers/movers (relevance-first), then your symbols */}
       {openFinancialModalNoteId && (() => {
         const note = notes.find(n => n._id === openFinancialModalNoteId);
         if (!note) return null;
         const prices = (note.financial?.data?.prices && Array.isArray(note.financial.data.prices)) ? note.financial.data.prices : [];
         const type = note.financial?.type || "crypto";
-        const sortedByGain = [...prices].sort((a, b) => (Number(b.changePercent) ?? 0) - (Number(a.changePercent) ?? 0));
-        const sortedByMove = [...prices].sort((a, b) => Math.abs(Number(b.changePercent) ?? 0) - Math.abs(Number(a.changePercent) ?? 0));
-        const topGainers = sortedByGain.slice(0, 5);
-        const topLosers = sortedByGain.slice(-5).reverse();
-        const largestMovers = sortedByMove.slice(0, 5);
+        const indexes = (note.financial?.data?.indexes && Array.isArray(note.financial.data.indexes)) ? note.financial.data.indexes : [];
+        const dataTopGainers = note.financial?.data?.topGainers;
+        const dataTopLosers = note.financial?.data?.topLosers;
+        const dataLargestMovers = note.financial?.data?.largestMovers;
+        const hasTopMovers = dataTopGainers?.length || dataTopLosers?.length || dataLargestMovers?.length;
+        const topGainers = (dataTopGainers && dataTopGainers.length > 0) ? dataTopGainers : [...prices].sort((a, b) => (Number(b.changePercent) ?? 0) - (Number(a.changePercent) ?? 0)).slice(0, 100);
+        const topLosers = (dataTopLosers && dataTopLosers.length > 0) ? dataTopLosers : [...prices].sort((a, b) => (Number(a.changePercent) ?? 0) - (Number(b.changePercent) ?? 0)).slice(0, 100);
+        const largestMovers = (dataLargestMovers && dataLargestMovers.length > 0) ? dataLargestMovers : [...prices].sort((a, b) => Math.abs(Number(b.changePercent) ?? 0) - Math.abs(Number(a.changePercent) ?? 0)).slice(0, 100);
+        const topMoversLoading = topMoversLoadingId === note._id;
+        const loadTopMovers = async () => {
+          setTopMoversLoadingId(note._id);
+          try {
+            await fetch(`${API_BASE}/api/notes/${note._id}/top-movers`);
+            await fetchNotes();
+          } finally {
+            setTopMoversLoadingId(null);
+          }
+        };
         return (
           <div
             role="dialog"
@@ -655,22 +725,48 @@ function App() {
                 position: "relative"
               }}
             >
-              <div style={{ padding: "16px", borderBottom: "1px solid #eee", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ padding: "16px", borderBottom: "1px solid #eee", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px" }}>
                 <h2 style={{ margin: 0, color: "var(--text-primary)" }}><span role="img" aria-label="Financial">📈</span> Financial ({type})</h2>
-                <button type="button" onClick={() => setOpenFinancialModalNoteId(null)} style={{ padding: "6px 12px", background: "#666", color: "#fff", border: "none", borderRadius: "4px", cursor: "pointer" }}>Close</button>
+                <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                  {type === "stock" && (
+                    <button type="button" onClick={() => loadTopMovers()} disabled={topMoversLoading} style={{ padding: "6px 12px", background: "#1976d2", color: "#fff", border: "none", borderRadius: "4px", cursor: topMoversLoading ? "wait" : "pointer", fontSize: "12px" }}>
+                      {topMoversLoading ? "Loading…" : "Load top 100 movers"}
+                    </button>
+                  )}
+                  <button type="button" onClick={() => setOpenFinancialModalNoteId(null)} style={{ padding: "6px 12px", background: "#666", color: "#fff", border: "none", borderRadius: "4px", cursor: "pointer" }}>Close</button>
+                </div>
               </div>
               <div style={{ padding: "16px" }}>
-                {prices.length === 0 ? (
-                  <p style={{ color: "var(--text-secondary, #666)" }}>No price data yet. Use &quot;Update financial&quot; on the note.</p>
+                {!hasTopMovers && prices.length === 0 ? (
+                  <p style={{ color: "var(--text-secondary, #666)" }}>No price data yet. Use &quot;Update financial&quot; on the note. For stocks, &quot;Load top 100 movers&quot; shows market-wide gainers/losers/movers, ordered by relevance to your note and news.</p>
                 ) : (
                   <>
+                    {indexes.length > 0 && (
+                      <section style={{ marginBottom: "16px" }}>
+                        <h3 style={{ fontSize: "14px", marginBottom: "8px", color: "var(--text-primary)" }}>Major indexes</h3>
+                        <ul style={{ listStyle: "none", padding: 0, margin: 0, fontSize: "13px", display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: "8px" }}>
+                          {indexes.map((p, i) => (
+                            <li key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 8px", borderBottom: "1px solid #f0f0f0", borderRadius: "4px", background: "var(--bg-tertiary, #f9f9f9)" }}>
+                              <span title={p.name || p.symbol}>{p.symbol}</span>
+                              <span style={{ color: (p.changePercent >= 0) ? "#2e7d32" : "#c62828" }}>
+                                {p.changePercent != null ? `${p.changePercent >= 0 ? "+" : ""}${Number(p.changePercent).toFixed(1)}%` : "—"}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </section>
+                    )}
+                    {hasTopMovers && <p style={{ fontSize: "12px", color: "var(--text-secondary)", marginBottom: "12px" }}>Top 100 stocks (relevance to this note and its news first).</p>}
                     {largestMovers.length > 0 && (
                       <section style={{ marginBottom: "16px" }}>
-                        <h3 style={{ fontSize: "14px", marginBottom: "8px", color: "var(--text-primary)" }}>Largest movers</h3>
-                        <ul style={{ listStyle: "none", padding: 0, margin: 0, fontSize: "13px" }}>
+                        <h3 style={{ fontSize: "14px", marginBottom: "8px", color: "var(--text-primary)" }}>Largest movers ({largestMovers.length})</h3>
+                        <ul style={{ listStyle: "none", padding: 0, margin: 0, fontSize: "13px", maxHeight: "200px", overflowY: "auto" }}>
                           {largestMovers.map((p, i) => (
-                            <li key={i} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", borderBottom: "1px solid #f0f0f0" }}>
-                              <span>{p.symbol}</span>
+                            <li key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0", borderBottom: "1px solid #f0f0f0" }}>
+                              <span>
+                                {p.symbol}
+                                {((p.relevanceScore ?? 0) > 0.3 || p.inUserList) && <span style={{ marginLeft: "6px", fontSize: "10px", color: "#1976d2", fontWeight: "bold" }}>• relevant</span>}
+                              </span>
                               <span>{Number(p.price ?? p.last ?? 0).toFixed(2)}</span>
                               <span style={{ color: (p.changePercent >= 0) ? "#2e7d32" : "#c62828" }}>
                                 {p.changePercent != null ? `${p.changePercent >= 0 ? "+" : ""}${Number(p.changePercent).toFixed(1)}%` : "—"}
@@ -682,11 +778,14 @@ function App() {
                     )}
                     {topGainers.length > 0 && (
                       <section style={{ marginBottom: "16px" }}>
-                        <h3 style={{ fontSize: "14px", marginBottom: "8px", color: "#2e7d32" }}>Top gainers</h3>
-                        <ul style={{ listStyle: "none", padding: 0, margin: 0, fontSize: "13px" }}>
+                        <h3 style={{ fontSize: "14px", marginBottom: "8px", color: "#2e7d32" }}>Top gainers ({topGainers.length})</h3>
+                        <ul style={{ listStyle: "none", padding: 0, margin: 0, fontSize: "13px", maxHeight: "200px", overflowY: "auto" }}>
                           {topGainers.map((p, i) => (
-                            <li key={i} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", borderBottom: "1px solid #f0f0f0" }}>
-                              <span>{p.symbol}</span>
+                            <li key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0", borderBottom: "1px solid #f0f0f0" }}>
+                              <span>
+                                {p.symbol}
+                                {((p.relevanceScore ?? 0) > 0.3 || p.inUserList) && <span style={{ marginLeft: "6px", fontSize: "10px", color: "#1976d2", fontWeight: "bold" }}>• relevant</span>}
+                              </span>
                               <span>{Number(p.price ?? p.last ?? 0).toFixed(2)}</span>
                               <span style={{ color: "#2e7d32" }}>{p.changePercent != null ? `+${Number(p.changePercent).toFixed(1)}%` : "—"}</span>
                             </li>
@@ -696,11 +795,14 @@ function App() {
                     )}
                     {topLosers.length > 0 && (
                       <section style={{ marginBottom: "16px" }}>
-                        <h3 style={{ fontSize: "14px", marginBottom: "8px", color: "#c62828" }}>Top losers</h3>
-                        <ul style={{ listStyle: "none", padding: 0, margin: 0, fontSize: "13px" }}>
+                        <h3 style={{ fontSize: "14px", marginBottom: "8px", color: "#c62828" }}>Top losers ({topLosers.length})</h3>
+                        <ul style={{ listStyle: "none", padding: 0, margin: 0, fontSize: "13px", maxHeight: "200px", overflowY: "auto" }}>
                           {topLosers.map((p, i) => (
-                            <li key={i} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", borderBottom: "1px solid #f0f0f0" }}>
-                              <span>{p.symbol}</span>
+                            <li key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0", borderBottom: "1px solid #f0f0f0" }}>
+                              <span>
+                                {p.symbol}
+                                {((p.relevanceScore ?? 0) > 0.3 || p.inUserList) && <span style={{ marginLeft: "6px", fontSize: "10px", color: "#1976d2", fontWeight: "bold" }}>• relevant</span>}
+                              </span>
                               <span>{Number(p.price ?? p.last ?? 0).toFixed(2)}</span>
                               <span style={{ color: "#c62828" }}>{p.changePercent != null ? `${Number(p.changePercent).toFixed(1)}%` : "—"}</span>
                             </li>
@@ -708,20 +810,22 @@ function App() {
                         </ul>
                       </section>
                     )}
-                    <section>
-                      <h3 style={{ fontSize: "14px", marginBottom: "8px", color: "var(--text-primary)" }}>All symbols</h3>
-                      <ul style={{ listStyle: "none", padding: 0, margin: 0, fontSize: "13px" }}>
-                        {prices.map((p, i) => (
-                          <li key={i} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", borderBottom: "1px solid #f0f0f0" }}>
-                            <span>{p.symbol}</span>
-                            <span>{Number(p.price ?? p.last ?? 0).toFixed(2)}</span>
-                            <span style={{ color: (p.changePercent >= 0) ? "#2e7d32" : "#c62828" }}>
-                              {p.changePercent != null ? `${p.changePercent >= 0 ? "+" : ""}${Number(p.changePercent).toFixed(1)}%` : "—"}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    </section>
+                    {prices.length > 0 && (
+                      <section>
+                        <h3 style={{ fontSize: "14px", marginBottom: "8px", color: "var(--text-primary)" }}>Your symbols</h3>
+                        <ul style={{ listStyle: "none", padding: 0, margin: 0, fontSize: "13px" }}>
+                          {prices.map((p, i) => (
+                            <li key={i} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", borderBottom: "1px solid #f0f0f0" }}>
+                              <span>{p.symbol}</span>
+                              <span>{Number(p.price ?? p.last ?? 0).toFixed(2)}</span>
+                              <span style={{ color: (p.changePercent >= 0) ? "#2e7d32" : "#c62828" }}>
+                                {p.changePercent != null ? `${p.changePercent >= 0 ? "+" : ""}${Number(p.changePercent).toFixed(1)}%` : "—"}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </section>
+                    )}
                   </>
                 )}
               </div>
@@ -781,146 +885,53 @@ function App() {
         </div>
       )}
       
-      {/* Navigation Tabs */}
-      {!showSplitView && !showEnhancedForm && !showVoiceRecorder && !showDrawing && !showFocusMode && (
-        <div className="navigation-buttons" style={{
-          width: "95%",
-          maxWidth: "1200px",
-          margin: "20px auto",
-          display: "flex",
-          gap: "10px",
-          justifyContent: "center",
-          flexWrap: "wrap"
-        }}>
-          <button
-            onClick={() => { setShowTrash(false); setShowExportImport(false); setShowDashboard(false); setShowDeadlines(false); }}
-            style={{
-              padding: "8px 16px",
-              background: !showTrash && !showExportImport && !showDashboard && !showDeadlines ? "#f5ba13" : "#999",
-              color: "white",
-              border: "none",
-              borderRadius: "4px",
-              cursor: "pointer"
-            }}
-          >
-            Notes
-          </button>
-          <button
-            onClick={() => { setShowTrash(false); setShowExportImport(false); setShowDashboard(true); setShowDeadlines(false); }}
-            style={{
-              padding: "8px 16px",
-              background: showDashboard ? "#f5ba13" : "#999",
-              color: "white",
-              border: "none",
-              borderRadius: "4px",
-              cursor: "pointer"
-            }}
-          >
-            Dashboard
-          </button>
-          <button
-            onClick={() => { setShowDeadlines(true); setShowTrash(false); setShowExportImport(false); setShowDashboard(false); }}
-            style={{
-              padding: "8px 16px",
-              background: showDeadlines ? "#f5ba13" : "#999",
-              color: "white",
-              border: "none",
-              borderRadius: "4px",
-              cursor: "pointer"
-            }}
-          >
-            <span role="img" aria-label="Deadlines">📅</span> Deadlines
-          </button>
-          <button
-            onClick={() => { setShowTrash(true); setShowExportImport(false); setShowDashboard(false); setShowDeadlines(false); }}
-            style={{
-              padding: "8px 16px",
-              background: showTrash ? "#f5ba13" : "#999",
-              color: "white",
-              border: "none",
-              borderRadius: "4px",
-              cursor: "pointer"
-            }}
-          >
-            Trash
-          </button>
-          <button
-            onClick={() => { setShowTrash(false); setShowExportImport(!showExportImport); setShowDashboard(false); }}
-            style={{
-              padding: "8px 16px",
-              background: showExportImport ? "#f5ba13" : "#999",
-              color: "white",
-              border: "none",
-              borderRadius: "4px",
-              cursor: "pointer"
-            }}
-          >
-            Export/Import
-          </button>
-          <button
-            onClick={() => { setShowSplitView(true); }}
-            style={{
-              padding: "8px 16px",
-              background: "#2196F3",
-              color: "white",
-              border: "none",
-              borderRadius: "4px",
-              cursor: "pointer"
-            }}
-          >
-            Split View
-          </button>
-          <button
-            onClick={() => { setShowVoiceRecorder(true); setShowDrawing(false); }}
-            style={{
-              padding: "8px 16px",
-              background: "#9C27B0",
-              color: "white",
-              border: "none",
-              borderRadius: "4px",
-              cursor: "pointer"
-            }}
-          >
-            <span role="img" aria-label="Voice recorder">🎤</span> Voice
-          </button>
-          <button
-            onClick={() => { setShowDrawing(true); setShowVoiceRecorder(false); }}
-            style={{
-              padding: "8px 16px",
-              background: "#FF9800",
-              color: "white",
-              border: "none",
-              borderRadius: "4px",
-              cursor: "pointer"
-            }}
-          >
-            <span role="img" aria-label="Drawing tool">✏️</span> Draw
-          </button>
-          <button
-            onClick={() => { setShowEnhancedForm(true); setSelectedNoteId(null); }}
-            style={{
-              padding: "8px 16px",
-              background: "#4CAF50",
-              color: "white",
-              border: "none",
-              borderRadius: "4px",
-              cursor: "pointer"
-            }}
-          >
-            + Enhanced
-          </button>
+      {/* Dashboard / Trash / Export / Deadlines as modals (opened from nav) */}
+      {showDashboard && (
+        <div role="dialog" aria-modal="true" aria-label="Dashboard" style={modalOverlayStyle} onClick={() => setShowDashboard(false)}>
+          <div style={modalContentStyle} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+              <h2 style={{ margin: 0, color: "var(--text-primary)" }}>📊 Integration Dashboard</h2>
+              <button type="button" onClick={() => setShowDashboard(false)} style={{ padding: "8px 16px", background: "#666", color: "#fff", border: "none", borderRadius: "4px", cursor: "pointer" }}>Close</button>
+            </div>
+            <IntegrationDashboard />
+          </div>
+        </div>
+      )}
+      {showTrash && (
+        <div role="dialog" aria-modal="true" aria-label="Trash" style={modalOverlayStyle} onClick={() => setShowTrash(false)}>
+          <div style={modalContentStyle} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+              <h2 style={{ margin: 0, color: "var(--text-primary)" }}>🗑️ Trash</h2>
+              <button type="button" onClick={() => setShowTrash(false)} style={{ padding: "8px 16px", background: "#666", color: "#fff", border: "none", borderRadius: "4px", cursor: "pointer" }}>Close</button>
+            </div>
+            <TrashView onRestore={fetchNotes} onDeletePermanent={fetchNotes} />
+          </div>
+        </div>
+      )}
+      {showExportImport && (
+        <div role="dialog" aria-modal="true" aria-label="Export / Import" style={modalOverlayStyle} onClick={() => setShowExportImport(false)}>
+          <div style={modalContentStyle} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+              <h2 style={{ margin: 0, color: "var(--text-primary)" }}>📤 Export / Import</h2>
+              <button type="button" onClick={() => setShowExportImport(false)} style={{ padding: "8px 16px", background: "#666", color: "#fff", border: "none", borderRadius: "4px", cursor: "pointer" }}>Close</button>
+            </div>
+            <ExportImport notes={notes} onImport={handleImport} />
+          </div>
+        </div>
+      )}
+      {showDeadlines && (
+        <div role="dialog" aria-modal="true" aria-label="Deadlines" style={modalOverlayStyle} onClick={() => setShowDeadlines(false)}>
+          <div style={modalContentStyle} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+              <h2 style={{ margin: 0, color: "var(--text-primary)" }}>📅 Deadlines</h2>
+              <button type="button" onClick={() => setShowDeadlines(false)} style={{ padding: "8px 16px", background: "#666", color: "#fff", border: "none", borderRadius: "4px", cursor: "pointer" }}>Close</button>
+            </div>
+            <DeadlinesView onRefresh={fetchNotes} />
+          </div>
         </div>
       )}
 
-      {showDashboard ? (
-        <IntegrationDashboard />
-      ) : showTrash ? (
-        <TrashView onRestore={fetchNotes} onDeletePermanent={fetchNotes} />
-      ) : showExportImport ? (
-        <ExportImport notes={notes} onImport={handleImport} />
-      ) : showDeadlines ? (
-        <DeadlinesView onRefresh={fetchNotes} />
-      ) : !showSplitView && !showEnhancedForm && !showVoiceRecorder && !showDrawing ? (
+      {!showSplitView && !showEnhancedForm && !showVoiceRecorder && !showDrawing ? (
         <>
           {/* Search and Filter Bar */}
           <div className="search-filter-container" style={{

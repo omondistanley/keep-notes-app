@@ -1,8 +1,8 @@
 /**
- * Twitter/X + Social RSS Service
- * - Twitter API v2 when TWITTER_BEARER_TOKEN is set
- * - RSS (Nitter / Twitter search RSS) - no key, free
- * Falls back to mock when neither returns data.
+ * Multi-platform Social Service (X/Twitter, Reddit, RSS fallbacks)
+ * - X/Twitter: API v2 when TWITTER_BEARER_TOKEN is set; else Nitter RSS
+ * - Reddit: search RSS (no API key)
+ * Falls back to mock when no data returned.
  */
 
 const Sentiment = require("sentiment");
@@ -65,42 +65,87 @@ class TwitterService {
   }
 
   /**
-   * Social RSS: Nitter search RSS (Twitter-like posts, no API key)
-   * Falls back to generic "social" RSS (e.g. Reddit RSS) if Nitter fails.
+   * Reddit-only: search r/all via RSS (no API key). Returns posts with source "Reddit".
+   */
+  async fetchRedditOnly(keywords, maxResults = 30) {
+    if (!keywords.length) return [];
+    const query = encodeURIComponent(keywords.slice(0, 3).join(" "));
+    try {
+      const feed = await rssParser.parseURL(
+        `https://www.reddit.com/r/all/search.rss?q=${query}&restrict_sr=on&sort=relevance`
+      );
+      const items = (feed && feed.items) || [];
+      return items.slice(0, maxResults).map((i, idx) => {
+        const title = i.title || "";
+        const content = (i.contentSnippet || i.content || title).slice(0, 500);
+        return addSentiment({
+          id: `reddit_${Date.now()}_${idx}`,
+          text: content || title,
+          title,
+          author: { username: (i.creator || i["dc:creator"] || "u/reddit").toString().slice(0, 50) },
+          createdAt: i.pubDate ? new Date(i.pubDate) : new Date(),
+          metrics: {},
+          source: "Reddit",
+          link: i.link
+        });
+      });
+    } catch (err) {
+      console.error("Reddit RSS error:", err.message);
+      return [];
+    }
+  }
+
+  /**
+   * X/Twitter-only RSS: Nitter search (no API key).
+   */
+  async fetchNitterRss(keywords, maxResults = 20) {
+    if (!keywords.length) return [];
+    const query = encodeURIComponent(keywords.slice(0, 2).join(" "));
+    try {
+      const feed = await rssParser.parseURL(`${NITTER_RSS_BASE}/search/rss?f=tweets&q=${query}`);
+      const items = (feed && feed.items) || [];
+      return items.slice(0, maxResults).map((i, idx) => {
+        const title = i.title || "";
+        const content = (i.contentSnippet || i.content || title).slice(0, 280);
+        return addSentiment({
+          id: `nitter_${Date.now()}_${idx}`,
+          text: content || title,
+          author: { username: (i.creator || i["dc:creator"] || "X").toString().slice(0, 50) },
+          createdAt: i.pubDate ? new Date(i.pubDate) : new Date(),
+          metrics: {},
+          source: "X (RSS)",
+          link: i.link
+        });
+      });
+    } catch (err) {
+      console.error("Nitter RSS error:", err.message);
+      return [];
+    }
+  }
+
+  /**
+   * Social RSS: Nitter first (X), then Reddit fallback. Used for single "tweets" search.
    */
   async fetchRssSocial(keywords, maxResults = 20) {
     if (!keywords.length) return [];
-    const query = encodeURIComponent(keywords.slice(0, 2).join(" "));
-    const urls = [
-      `${NITTER_RSS_BASE}/search/rss?f=tweets&q=${query}`,
-      `https://www.reddit.com/r/all/search.rss?q=${query}&restrict_sr=on&sort=relevance`
-    ];
-    for (const url of urls) {
-      try {
-        const feed = await rssParser.parseURL(url);
-        const items = (feed && feed.items) || [];
-        const tweets = items.slice(0, maxResults).map((i, idx) => {
-          const title = i.title || "";
-          const content = i.contentSnippet || i.content || title;
-          const text = content.length > 280 ? content.substring(0, 277) + "…" : content;
-          return addSentiment({
-            id: `rss_${Date.now()}_${idx}`,
-            text: text || title,
-            author: {
-              username: (i.creator || i["dc:creator"] || i.link || "").replace(/^https?:\/\//, "").substring(0, 50) || "RSS"
-            },
-            createdAt: i.pubDate ? new Date(i.pubDate) : new Date(),
-            metrics: {},
-            source: feed.title || "RSS",
-            link: i.link
-          });
-        });
-        if (tweets.length > 0) return tweets;
-      } catch (err) {
-        console.error("Social RSS error for", url.substring(0, 60), err.message);
-      }
+    const fromNitter = await this.fetchNitterRss(keywords, maxResults);
+    if (fromNitter.length > 0) return fromNitter;
+    const fromReddit = await this.fetchRedditOnly(keywords, maxResults);
+    return fromReddit.slice(0, maxResults);
+  }
+
+  /**
+   * Search Reddit by keywords; returns { posts, sentiment }.
+   */
+  async searchReddit(keywords, options = {}) {
+    const maxResults = options.maxResults || 30;
+    let posts = await this.fetchRedditOnly(keywords, maxResults);
+    if (posts.length === 0) {
+      const mock = this.generateMockTweets(keywords, Math.min(5, maxResults));
+      posts = mock.map((m) => ({ ...m, source: "Reddit (mock)", id: m.id.replace("tweet_", "reddit_") }));
     }
-    return [];
+    const sentiment = this.analyzeSentiment({ tweets: posts });
+    return { posts, sentiment };
   }
 
   generateMockTweets(keywords, count = 10) {
@@ -127,6 +172,29 @@ class TwitterService {
       });
     }
     return tweets;
+  }
+
+  /**
+   * Fetch from all enabled social platforms (X, Reddit). Returns per-platform results.
+   * socialConfig: { x: { enabled, keywords }, reddit: { enabled, keywords } }
+   */
+  async searchAllPlatforms(socialConfig, options = {}) {
+    const maxResults = options.maxResults || 50;
+    const result = { x: { tweets: [], sentiment: null }, reddit: { posts: [], sentiment: null } };
+    const xConfig = socialConfig?.x || {};
+    const redditConfig = socialConfig?.reddit || {};
+    const xKeywords = Array.isArray(xConfig.keywords) && xConfig.keywords.length ? xConfig.keywords : [];
+    const redditKeywords = Array.isArray(redditConfig.keywords) && redditConfig.keywords.length ? redditConfig.keywords : xKeywords;
+
+    if (xConfig.enabled && xKeywords.length > 0) {
+      const xResult = await this.searchTweets(xKeywords, { maxResults });
+      result.x = { tweets: xResult.tweets || [], sentiment: xResult.sentiment || null };
+    }
+    if (redditConfig.enabled && redditKeywords.length > 0) {
+      const redditResult = await this.searchReddit(redditKeywords, { maxResults });
+      result.reddit = { posts: redditResult.posts || [], sentiment: redditResult.sentiment || null };
+    }
+    return result;
   }
 
   /**

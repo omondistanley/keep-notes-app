@@ -41,7 +41,7 @@ const emptyIntegrations = () => ({
   deadline: null,
   news: { enabled: false, keywords: [] },
   financial: { enabled: false, type: "crypto", symbols: [] },
-  social: { x: { enabled: false, keywords: [] } }
+  social: { x: { enabled: false, keywords: [] }, reddit: { enabled: false, keywords: [] } }
 });
 
 function readDraftFromStorage() {
@@ -74,6 +74,10 @@ function readDraftFromStorage() {
                 x: {
                   enabled: Boolean(d.integrations.social?.x?.enabled),
                   keywords: Array.isArray(d.integrations.social?.x?.keywords) ? d.integrations.social.x.keywords : []
+                },
+                reddit: {
+                  enabled: Boolean(d.integrations.social?.reddit?.enabled),
+                  keywords: Array.isArray(d.integrations.social?.reddit?.keywords) ? d.integrations.social.reddit.keywords : (Array.isArray(d.integrations.social?.x?.keywords) ? d.integrations.social.x.keywords : [])
                 }
               }
             }
@@ -180,11 +184,16 @@ function CreateArea(props) {
           symbols: integrations.financial.symbols
         };
       }
-      if (integrations.social.x.enabled && integrations.social.x.keywords.length) {
+      const socialKeywords = integrations.social.x.keywords.length ? integrations.social.x.keywords : integrations.social.reddit.keywords;
+      if ((integrations.social.x.enabled || integrations.social.reddit.enabled) && socialKeywords.length) {
         payload.social = {
           x: {
-            enabled: true,
-            keywords: integrations.social.x.keywords
+            enabled: Boolean(integrations.social.x.enabled),
+            keywords: integrations.social.x.enabled ? socialKeywords : []
+          },
+          reddit: {
+            enabled: Boolean(integrations.social.reddit.enabled),
+            keywords: integrations.social.reddit.enabled ? socialKeywords : []
           }
         };
       }
@@ -409,7 +418,7 @@ function CreateArea(props) {
                 </div>
               )}
             </div>
-            {/* Social (X/Twitter) */}
+            {/* Social: X (Twitter) + Reddit – shared keywords */}
             <div style={{ marginBottom: "4px" }}>
               <label style={{ display: "flex", alignItems: "center", marginBottom: "4px" }}>
                 <input
@@ -417,41 +426,53 @@ function CreateArea(props) {
                   checked={integrations.social.x.enabled}
                   onChange={(e) => {
                     const checked = !!(e?.target?.checked);
-                    setIntegrations(prev => ({
-                      ...prev,
-                      social: { ...prev.social, x: { ...prev.social.x, enabled: checked } }
-                    }));
+                    setIntegrations(prev => ({ ...prev, social: { ...prev.social, x: { ...prev.social.x, enabled: checked } } }));
                   }}
                   style={{ marginRight: "6px" }}
                 />
-                🐦 X / Social keywords
+                <span role="img" aria-label="X">🐦</span> X / Twitter
               </label>
-              {integrations.social.x.enabled && (
+              <label style={{ display: "flex", alignItems: "center", marginBottom: "6px" }}>
+                <input
+                  type="checkbox"
+                  checked={integrations.social.reddit.enabled}
+                  onChange={(e) => {
+                    const checked = !!(e?.target?.checked);
+                    setIntegrations(prev => ({ ...prev, social: { ...prev.social, reddit: { ...prev.social.reddit, enabled: checked, keywords: prev.social.x.keywords } } }));
+                  }}
+                  style={{ marginRight: "6px" }}
+                />
+                <span role="img" aria-label="Reddit">📱</span> Reddit
+              </label>
+              {(integrations.social.x.enabled || integrations.social.reddit.enabled) && (
                 <>
-                  {integrations.social.x.keywords.length > 0 && (
+                  {(integrations.social.x.keywords.length > 0 || integrations.social.reddit.keywords.length > 0) && (
                     <ol style={{ margin: "6px 0", paddingLeft: "20px", fontSize: "12px" }}>
-                      {integrations.social.x.keywords.map((k, i) => (
+                      {(integrations.social.x.keywords.length ? integrations.social.x.keywords : integrations.social.reddit.keywords || []).map((k, i) => (
                         <li key={i} style={{ marginBottom: "4px", display: "flex", alignItems: "center", gap: "6px" }}>
                           <span>{k}</span>
-                          <button type="button" onClick={() => setIntegrations(prev => ({ ...prev, social: { x: { ...prev.social.x, keywords: prev.social.x.keywords.filter((_, idx) => idx !== i) } } }))} style={{ background: "none", border: "none", cursor: "pointer", color: "#c62828", fontSize: "14px" }} aria-label="Remove">×</button>
+                          <button type="button" onClick={() => {
+                            const kw = (integrations.social.x.keywords.length ? integrations.social.x.keywords : integrations.social.reddit.keywords).filter((_, idx) => idx !== i);
+                            setIntegrations(prev => ({ ...prev, social: { x: { ...prev.social.x, keywords: kw }, reddit: { ...prev.social.reddit, keywords: kw } } }));
+                          }} style={{ background: "none", border: "none", cursor: "pointer", color: "#c62828", fontSize: "14px" }} aria-label="Remove">×</button>
                         </li>
                       ))}
                     </ol>
                   )}
-                  {integrations.social.x.keywords.length < 50 && (
+                  {(integrations.social.x.keywords?.length < 50 || integrations.social.reddit.keywords?.length < 50) && (
                     <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "6px" }}>
                       <input
                         type="text"
                         value={socialKeywordInput}
                         onChange={(e) => setSocialKeywordInput(e.target.value)}
-                        placeholder="e.g. crypto, tech (comma-separated)"
-                        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); const v = socialKeywordInput.trim(); if (v) { const toAdd = v.split(",").map(x => x.trim()).filter(Boolean).filter(x => !integrations.social.x.keywords.includes(x)); setIntegrations(prev => ({ ...prev, social: { x: { ...prev.social.x, keywords: [...prev.social.x.keywords, ...toAdd].slice(0, 50) } } })); setSocialKeywordInput(""); } } }}
+                        placeholder="Keywords for X & Reddit (comma-separated)"
+                        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); const v = socialKeywordInput.trim(); if (v) { const kw = integrations.social.x.keywords.length ? integrations.social.x.keywords : (integrations.social.reddit.keywords || []); const toAdd = v.split(",").map(x => x.trim()).filter(Boolean).filter(x => !kw.includes(x)); const next = [...kw, ...toAdd].slice(0, 50); setIntegrations(prev => ({ ...prev, social: { x: { ...prev.social.x, keywords: next }, reddit: { ...prev.social.reddit, keywords: next } } })); setSocialKeywordInput(""); } } }}
                         style={{ flex: 1, maxWidth: "280px", padding: "6px 8px", fontSize: "12px", border: "1px solid #ddd", borderRadius: "4px" }}
                       />
-                      <button type="button" onClick={() => { const v = socialKeywordInput.trim(); if (v) { const toAdd = v.split(",").map(x => x.trim()).filter(Boolean).filter(x => !integrations.social.x.keywords.includes(x)); setIntegrations(prev => ({ ...prev, social: { x: { ...prev.social.x, keywords: [...prev.social.x.keywords, ...toAdd].slice(0, 50) } } })); setSocialKeywordInput(""); } }} style={{ padding: "6px 10px", fontSize: "12px" }}>Add</button>
+                      <button type="button" onClick={() => { const v = socialKeywordInput.trim(); if (v) { const kw = integrations.social.x.keywords.length ? integrations.social.x.keywords : (integrations.social.reddit.keywords || []); const toAdd = v.split(",").map(x => x.trim()).filter(Boolean).filter(x => !kw.includes(x)); const next = [...kw, ...toAdd].slice(0, 50); setIntegrations(prev => ({ ...prev, social: { x: { ...prev.social.x, keywords: next }, reddit: { ...prev.social.reddit, keywords: next } } })); setSocialKeywordInput(""); } }} style={{ padding: "6px 10px", fontSize: "12px" }}>Add</button>
                     </div>
                   )}
-                  <span style={{ fontSize: "11px", color: "#666", marginTop: "4px", display: "block" }}>{integrations.social.x.keywords.length} / 50 keywords</span>
+                  <span style={{ fontSize: "11px", color: "#666", marginTop: "4px", display: "block" }}>{(integrations.social.x.keywords?.length || integrations.social.reddit?.keywords?.length || 0)} / 50 keywords (shared)</span>
                 </>
               )}
             </div>

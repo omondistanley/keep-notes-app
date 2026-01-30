@@ -1,8 +1,19 @@
 # Keep Notes App
 
-A full-stack notes application with integrations for news, financial data, social feeds, deadlines, and more.
+A full-stack notes application with integrations for news, financial data, social feeds (X, Reddit), major indexes, deadlines, and more.
 
 **Deployed:** https://dev-tech-topaz.vercel.app/
+
+---
+
+## What kind of product is this?
+
+**Keep Notes App** is a **context-aware research and note-taking product** that ties each note to live, external context:
+
+- **Research / note-taking:** You write notes (titles, content, tags, deadlines) and attach **integrations** per note: news keywords, financial symbols, and social keywords (X/Twitter and Reddit).
+- **Live context per note:** Each note can pull in **news** (top articles + subject summary), **financials** (your symbols + major indexes + top 100 movers ordered by relevance to the note), and **social** (X and Reddit posts by keyword, with sentiment). So the note becomes a small hub for “everything about this topic” instead of a static text blob.
+- **Personal intelligence layer:** The app doesn’t just store text—it correlates news, markets, and social sentiment with the note’s subject, surfaces top movers and indexes, and (with “Update all”) refreshes news, financials, and social in one go. That makes it useful for **research, due-diligence, and tracking themes** (e.g. a note on “AI chips” gets relevant news, NVDA/AMD in movers, and X/Reddit buzz).
+- **Product category:** It sits between a **smart notebook** and a **lightweight research dashboard**: notes are first-class, but each note is augmented by configurable, refreshable context from news, markets, and multiple social platforms.
 
 ---
 
@@ -89,7 +100,9 @@ Test integrations (with server running): `node scripts/test-integrations.js`
 
 - **Notes:** Create, edit, delete; simple and enhanced forms
 - **Deadlines:** Track due dates; view Upcoming / Overdue (Nav → Deadlines)
-- **Integrations (per note):** News by keywords, stocks/crypto symbols, social/X by keywords
+- **Integrations (per note):** News by keywords, stocks/crypto symbols, social (X + Reddit) by keywords
+- **Financial – Major indexes + top 100 movers (stocks):** For stock notes, “Update financial” fetches **major indexes** (S&P 500, NASDAQ 100, Dow, Russell 2000, sector ETFs like XLF/XLK/XLE, EFA/EEM, etc.) and shows them in the Financial modal. It also fetches up to **100** largest movers, top gainers, and top losers (market-wide), **relevance-ordered** to the note and its news. Use “Load top 100 movers” to refresh.
+- **Social – Multiple platforms:** **X (Twitter)** and **Reddit** are supported per note. Enable one or both in Integrations, add shared keywords, and use “Fetch social” to pull posts from both; each platform shows its own sentiment and snippets on the note.
 - **Command palette:** `Ctrl+K` / `Cmd+K` — search, dark mode, deadlines, focus mode
 - **Split view:** Side-by-side note management
 - **Focus mode:** Distraction-free writing
@@ -109,7 +122,7 @@ Test integrations (with server running): `node scripts/test-integrations.js`
 - **DELETE** `/api/notes/DeleteNote/:id` — delete note
 - **POST** `/api/notes/:id/fetch-news` — fetch news for note
 - **POST** `/api/notes/:id/update-financial` — update financial data
-- **POST** `/api/notes/:id/fetch-tweets` — fetch social/tweets
+- **POST** `/api/notes/:id/fetch-tweets` — fetch social (X + Reddit when enabled)
 - **GET** `/api/notes/upcoming-deadlines?days=14` — upcoming deadlines
 - **GET** `/api/notes/export` — export all notes as JSON
 

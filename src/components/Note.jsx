@@ -149,8 +149,10 @@ function Note(props) {
   const hasFinancialData = props.financial && (props.financial.summary || (props.financial.data?.prices && props.financial.data.prices.length > 0));
   const prices = (hasFinancialData && props.financial?.data?.prices) || [];
   const tweets = props.social?.x?.tweets;
-  const hasSocialData = tweets && Array.isArray(tweets) && tweets.length > 0;
+  const redditPosts = props.social?.reddit?.posts;
+  const hasSocialData = (tweets && Array.isArray(tweets) && tweets.length > 0) || (redditPosts && Array.isArray(redditPosts) && redditPosts.length > 0);
   const socialSentiment = props.social?.x?.sentiment;
+  const redditSentiment = props.social?.reddit?.sentiment;
   const hasAttachments = props.attachments && props.attachments.length > 0;
   const hasDrawings = props.drawings && props.drawings.length > 0;
   const hasIntegrationActions = props.onFetchNews || props.onFetchTweets || props.onUpdateFinancial || props.onUpdateAll;
@@ -175,9 +177,16 @@ function Note(props) {
         </div>
       )}
 
-      {/* News: summary + sentiment + compact headlines; Open opens modal */}
+      {/* News: summary + sentiment + compact headlines; whole section opens modal */}
       {(props.news?.enabled && props.news?.keywords?.length) || hasNewsData ? (
-        <div style={sectionStyle}>
+        <div
+          role="button"
+          tabIndex={0}
+          style={{ ...sectionStyle, cursor: props.onOpenNewsModal ? "pointer" : undefined }}
+          onClick={props.onOpenNewsModal ? (e) => { e.stopPropagation(); props.onOpenNewsModal(); } : undefined}
+          onKeyDown={props.onOpenNewsModal ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); props.onOpenNewsModal(); } } : undefined}
+          aria-label="Open news in full view"
+        >
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}>
             <span>
               <strong><span role="img" aria-label="News">📰</span> News</strong>
@@ -187,13 +196,7 @@ function Note(props) {
               </span>
             </span>
             {props.onOpenNewsModal && (
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); props.onOpenNewsModal(); }}
-                style={{ padding: "4px 10px", fontSize: "11px", cursor: "pointer", background: "#1976d2", color: "#fff", border: "none", borderRadius: "4px" }}
-              >
-                Open
-              </button>
+              <span style={{ fontSize: "11px", color: "var(--text-secondary, #666)" }}>Click to open</span>
             )}
           </div>
           {/* Brief summary from note content + keywords */}
@@ -219,9 +222,16 @@ function Note(props) {
         </div>
       ) : null}
 
-      {/* Financial: chart + compact table; Open opens modal with all symbols and top gainers/movers */}
+      {/* Financial: chart + compact table; whole section opens modal with all symbols and top gainers/movers */}
       {(props.financial?.enabled && (props.financial?.symbols?.length || prices.length > 0)) || hasFinancialData ? (
-        <div style={sectionStyle}>
+        <div
+          role="button"
+          tabIndex={0}
+          style={{ ...sectionStyle, cursor: props.onOpenFinancialModal ? "pointer" : undefined }}
+          onClick={props.onOpenFinancialModal ? (e) => { e.stopPropagation(); props.onOpenFinancialModal(); } : undefined}
+          onKeyDown={props.onOpenFinancialModal ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); props.onOpenFinancialModal(); } } : undefined}
+          aria-label="Open financial data in full view"
+        >
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}>
             <span>
               <strong><span role="img" aria-label="Financial">📈</span> Financial</strong>
@@ -230,13 +240,7 @@ function Note(props) {
               )}
             </span>
             {props.onOpenFinancialModal && (
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); props.onOpenFinancialModal(); }}
-                style={{ padding: "4px 10px", fontSize: "11px", cursor: "pointer", background: "#1976d2", color: "#fff", border: "none", borderRadius: "4px" }}
-              >
-                Open
-              </button>
+              <span style={{ fontSize: "11px", color: "var(--text-secondary, #666)" }}>Click to open</span>
             )}
           </div>
           {prices.length > 0 && (
@@ -278,10 +282,10 @@ function Note(props) {
         </div>
       ) : null}
 
-      {/* Social / X: only when tweets are available — sentiment summary + 1–2 snippets */}
-      {hasSocialData && (
+      {/* Social – X (Twitter) */}
+      {tweets && tweets.length > 0 && (
         <div style={sectionStyle}>
-          <strong><span role="img" aria-label="Social">🐦</span> X</strong>
+          <strong><span role="img" aria-label="X">🐦</span> X / Twitter</strong>
           {socialSentiment && (
             <>
               {sentimentBadge(socialSentiment.overall)}
@@ -292,6 +296,28 @@ function Note(props) {
           )}
           <div style={{ marginTop: "6px", fontSize: "12px" }}>
             {tweets.slice(0, 2).map((t, i) => (
+              <div key={i} style={{ marginBottom: "4px" }}>
+                {(t.text || t.title || "").length > 60 ? (t.text || t.title || "").substring(0, 60) + "…" : (t.text || t.title || "")}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Social – Reddit */}
+      {redditPosts && redditPosts.length > 0 && (
+        <div style={sectionStyle}>
+          <strong><span role="img" aria-label="Reddit">📱</span> Reddit</strong>
+          {redditSentiment && (
+            <>
+              {sentimentBadge(redditSentiment.overall)}
+              <span style={{ marginLeft: "6px", fontSize: "11px", color: "var(--text-secondary, #666)" }}>
+                ↑{(redditSentiment.positive * 100).toFixed(0)}% pos · ↓{(redditSentiment.negative * 100).toFixed(0)}% neg · {(redditSentiment.neutral * 100).toFixed(0)}% neutral
+              </span>
+            </>
+          )}
+          <div style={{ marginTop: "6px", fontSize: "12px" }}>
+            {redditPosts.slice(0, 2).map((t, i) => (
               <div key={i} style={{ marginBottom: "4px" }}>
                 {(t.text || t.title || "").length > 60 ? (t.text || t.title || "").substring(0, 60) + "…" : (t.text || t.title || "")}
               </div>
@@ -381,7 +407,7 @@ function Note(props) {
 
       {showCompact && (
         <div style={{ marginTop: "8px", fontSize: "11px", color: "var(--text-secondary, #666)" }}>
-          Click card or use Open to view in modal
+          Click card to view in modal
         </div>
       )}
 
@@ -437,7 +463,7 @@ function Note(props) {
               onClick={() => handleIntegrationAction("tweets", props.onFetchTweets)}
               style={{ padding: "4px 8px", fontSize: "11px", cursor: integrationLoading === "tweets" ? "wait" : "pointer" }}
             >
-              {integrationLoading === "tweets" ? "…" : "Fetch tweets"}
+              {integrationLoading === "tweets" ? "…" : "Fetch social"}
             </button>
           )}
           {props.onUpdateFinancial && (

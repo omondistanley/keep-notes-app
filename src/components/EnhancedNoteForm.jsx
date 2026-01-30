@@ -24,6 +24,10 @@ const EnhancedNoteForm = ({ note = null, onSave, onCancel }) => {
       x: {
         enabled: note?.social?.x?.enabled || false,
         keywords: note?.social?.x?.keywords || []
+      },
+      reddit: {
+        enabled: note?.social?.reddit?.enabled || false,
+        keywords: note?.social?.reddit?.keywords || note?.social?.x?.keywords || []
       }
     }
   });
@@ -318,41 +322,40 @@ const EnhancedNoteForm = ({ note = null, onSave, onCancel }) => {
 
         {activeTab === "social" && (
           <div>
-            <label style={{ display: "flex", alignItems: "center", marginBottom: "10px" }}>
-              <input
-                type="checkbox"
-                checked={formData.social.x.enabled}
-                onChange={(e) => handleChange("social.x.enabled", e.target.checked)}
-                style={{ marginRight: "8px" }}
-              />
-              <span style={{ color: "var(--text-primary)" }}>Enable X/Twitter Integration</span>
+            <label style={{ display: "flex", alignItems: "center", marginBottom: "6px" }}>
+              <input type="checkbox" checked={formData.social.x.enabled} onChange={(e) => setFormData(prev => ({ ...prev, social: { ...prev.social, x: { ...prev.social.x, enabled: e.target.checked } } }))} style={{ marginRight: "8px" }} />
+              <span style={{ color: "var(--text-primary)" }}>🐦 X / Twitter</span>
             </label>
-            {formData.social.x.enabled && (
+            <label style={{ display: "flex", alignItems: "center", marginBottom: "10px" }}>
+              <input type="checkbox" checked={formData.social.reddit.enabled} onChange={(e) => setFormData(prev => ({ ...prev, social: { ...prev.social, reddit: { ...prev.social.reddit, enabled: e.target.checked } } }))} style={{ marginRight: "8px" }} />
+              <span style={{ color: "var(--text-primary)" }}>📱 Reddit</span>
+            </label>
+            {(formData.social.x.enabled || formData.social.reddit.enabled) && (
               <div>
-                {formData.social.x.keywords.length > 0 && (
+                {((formData.social.x.keywords?.length || formData.social.reddit.keywords?.length) || 0) > 0 && (
                   <ol style={{ margin: "6px 0", paddingLeft: "20px", fontSize: "12px" }}>
-                    {formData.social.x.keywords.map((k, i) => (
+                    {(formData.social.x.keywords?.length ? formData.social.x.keywords : formData.social.reddit.keywords || []).map((k, i) => (
                       <li key={i} style={{ marginBottom: "4px", display: "flex", alignItems: "center", gap: "6px" }}>
                         <span>{k}</span>
-                        <button type="button" onClick={() => handleChange("social.x.keywords", formData.social.x.keywords.filter((_, idx) => idx !== i))} style={{ background: "none", border: "none", cursor: "pointer", color: "#c62828", fontSize: "14px" }} aria-label="Remove">×</button>
+                        <button type="button" onClick={() => { const kw = (formData.social.x.keywords?.length ? formData.social.x.keywords : formData.social.reddit.keywords).filter((_, idx) => idx !== i); setFormData(prev => ({ ...prev, social: { ...prev.social, x: { ...prev.social.x, keywords: kw }, reddit: { ...prev.social.reddit, keywords: kw } } })); }} style={{ background: "none", border: "none", cursor: "pointer", color: "#c62828", fontSize: "14px" }} aria-label="Remove">×</button>
                       </li>
                     ))}
                   </ol>
                 )}
-                {formData.social.x.keywords.length < 50 && (
+                {((formData.social.x.keywords?.length || formData.social.reddit.keywords?.length) || 0) < 50 && (
                   <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "6px" }}>
                     <input
                       type="text"
-                      placeholder="Add keyword(s), comma-separated (e.g. crypto, tech)"
+                      placeholder="Keywords for X & Reddit (comma-separated)"
                       value={socialKeywordInput}
                       onChange={(e) => setSocialKeywordInput(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); const v = socialKeywordInput.trim(); if (v) { const toAdd = v.split(",").map(x => x.trim()).filter(Boolean).filter(x => !formData.social.x.keywords.includes(x)); handleChange("social.x.keywords", [...formData.social.x.keywords, ...toAdd].slice(0, 50)); setSocialKeywordInput(""); } } }}
+                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); const v = socialKeywordInput.trim(); if (v) { const kw = formData.social.x.keywords?.length ? formData.social.x.keywords : (formData.social.reddit.keywords || []); const toAdd = v.split(",").map(x => x.trim()).filter(Boolean).filter(x => !kw.includes(x)); const next = [...kw, ...toAdd].slice(0, 50); setFormData(prev => ({ ...prev, social: { ...prev.social, x: { ...prev.social.x, keywords: next }, reddit: { ...prev.social.reddit, keywords: next } } })); setSocialKeywordInput(""); } } }}
                       style={{ flex: 1, padding: "10px", border: "1px solid var(--border-color)", borderRadius: "4px", background: "var(--bg-tertiary)", color: "var(--text-primary)" }}
                     />
-                    <button type="button" onClick={() => { const v = socialKeywordInput.trim(); if (v) { const toAdd = v.split(",").map(x => x.trim()).filter(Boolean).filter(x => !formData.social.x.keywords.includes(x)); handleChange("social.x.keywords", [...formData.social.x.keywords, ...toAdd].slice(0, 50)); setSocialKeywordInput(""); } }} style={{ padding: "8px 12px" }}>Add</button>
+                    <button type="button" onClick={() => { const v = socialKeywordInput.trim(); if (v) { const kw = formData.social.x.keywords?.length ? formData.social.x.keywords : (formData.social.reddit.keywords || []); const toAdd = v.split(",").map(x => x.trim()).filter(Boolean).filter(x => !kw.includes(x)); const next = [...kw, ...toAdd].slice(0, 50); setFormData(prev => ({ ...prev, social: { ...prev.social, x: { ...prev.social.x, keywords: next }, reddit: { ...prev.social.reddit, keywords: next } } })); setSocialKeywordInput(""); } }} style={{ padding: "8px 12px" }}>Add</button>
                   </div>
                 )}
-                <span style={{ fontSize: "12px", color: "var(--text-secondary, #666)", marginTop: "4px", display: "block" }}>{formData.social.x.keywords.length} / 50 keywords</span>
+                <span style={{ fontSize: "12px", color: "var(--text-secondary, #666)", marginTop: "4px", display: "block" }}>{(formData.social.x.keywords?.length || formData.social.reddit.keywords?.length || 0)} / 50 keywords (shared)</span>
               </div>
             )}
           </div>
