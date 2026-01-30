@@ -298,8 +298,11 @@ function CreateArea(props) {
               <label style={{ display: "block", marginBottom: "4px" }}><span role="img" aria-label="calendar">📅</span> Deadline (optional)</label>
               <input
                 type="datetime-local"
-                value={integrations.deadline || ""}
-                onChange={(e) => setIntegrations(prev => ({ ...prev, deadline: e.target.value || null }))}
+                value={integrations.deadline ?? ""}
+                onChange={(e) => {
+                  const v = e?.target?.value ?? "";
+                  setIntegrations(prev => ({ ...prev, deadline: v || null }));
+                }}
                 style={{ padding: "4px 8px", width: "100%", maxWidth: "280px", border: "1px solid #ddd", borderRadius: "4px" }}
               />
             </div>
