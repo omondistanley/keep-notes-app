@@ -27,6 +27,8 @@ const SplitView = ({
   const [splitRatio, setSplitRatio] = useState(55);
   const [isDragging, setIsDragging] = useState(false);
   const [addText, setAddText] = useState("");
+  const [showAddText, setShowAddText] = useState(false);
+  const [showVoice, setShowVoice] = useState(false);
 
   const handleMouseDown = () => setIsDragging(true);
   const handleMouseUp = useCallback(() => setIsDragging(false), []);
@@ -59,6 +61,7 @@ const SplitView = ({
     if (!text || !canAddToNote) return;
     onAddTextToNote(text);
     setAddText("");
+    setShowAddText(false);
   };
 
   return (
@@ -73,7 +76,7 @@ const SplitView = ({
         overflow: "hidden"
       }}
     >
-      {/* Left: Note list + Selected note with integrations */}
+      {/* Left: Note list + Note opens and fits in framed area */}
       <div
         style={{
           width: `${splitRatio}%`,
@@ -123,7 +126,8 @@ const SplitView = ({
             )}
           </div>
         </div>
-        <div style={{ flex: 1, overflowY: "auto", padding: "12px" }}>
+        {/* Note opens and fits into this framed area */}
+        <div className="split-view-note-frame" style={{ margin: "8px", marginTop: "0" }}>
           {selectedNote ? (
             <Note
               id={selectedNote._id}
@@ -174,82 +178,153 @@ const SplitView = ({
         aria-hidden
       />
 
-      {/* Right: Tools – add to current note */}
+      {/* Right: Screenshot format – main content + toolbar bar + tool palette bar (no boxes per icon) */}
       <div
         style={{
           width: `${100 - splitRatio}%`,
-          overflowY: "auto",
-          padding: "16px",
-          background: "var(--bg-primary)",
           display: "flex",
           flexDirection: "column",
-          gap: "16px",
-          minWidth: 0
+          minWidth: 0,
+          overflow: "hidden",
+          background: "var(--bg-primary)"
         }}
       >
-        <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "4px" }}>
-          Add to current note
-        </div>
         {!hasNote && (
-          <p style={{ fontSize: "12px", color: "var(--text-secondary)", margin: "0 0 12px 0" }}>
-            Select a note on the left to add voice, drawings, or text. Content is saved into that note and used for integrations.
-          </p>
+          <div style={{ padding: "10px 14px", fontSize: "12px", color: "var(--text-secondary)", background: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
+            Select a note on the left to add content. All tools save into that note.
+          </div>
         )}
 
-        {/* Add information (text) */}
-        <section style={{ background: "var(--bg-secondary)", padding: "12px", borderRadius: "8px", border: "1px solid var(--border-color)" }}>
-          <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "var(--text-secondary)", marginBottom: "6px" }}>
-            Add information
-          </label>
-          <textarea
-            value={addText}
-            onChange={(e) => setAddText(e.target.value)}
-            placeholder="Type here to append to the current note..."
-            disabled={!hasNote}
-            style={{
-              width: "100%",
-              minHeight: "80px",
-              padding: "10px",
-              fontSize: "13px",
-              border: "1px solid var(--border-color)",
-              borderRadius: "6px",
-              background: "var(--bg-primary)",
-              color: "var(--text-primary)",
-              resize: "vertical",
-              marginBottom: "8px"
-            }}
-          />
+        {/* Main content area – framed, fits canvas / add-text / voice */}
+        <div
+          style={{
+            flex: 1,
+            minHeight: 0,
+            overflow: "auto",
+            border: "1px dashed var(--border-color)",
+            borderRadius: "6px",
+            margin: "8px",
+            background: "var(--bg-secondary)",
+            display: "flex",
+            flexDirection: "column"
+          }}
+        >
+          {showAddText && (
+            <div style={{ padding: "12px", borderBottom: "1px solid var(--border-color)" }}>
+              <textarea
+                value={addText}
+                onChange={(e) => setAddText(e.target.value)}
+                placeholder="Type to append to current note..."
+                disabled={!hasNote}
+                style={{
+                  width: "100%",
+                  minHeight: "70px",
+                  padding: "10px",
+                  fontSize: "13px",
+                  border: "1px solid var(--border-color)",
+                  borderRadius: "6px",
+                  background: "var(--bg-primary)",
+                  color: "var(--text-primary)",
+                  resize: "vertical",
+                  marginBottom: "8px"
+                }}
+              />
+              <button
+                type="button"
+                onClick={handleAddTextToNote}
+                disabled={!hasNote || !addText.trim()}
+                style={{ padding: "6px 12px", fontSize: "12px", marginRight: "8px" }}
+              >
+                Add to note
+              </button>
+              <button type="button" onClick={() => setShowAddText(false)} style={{ padding: "6px 12px", fontSize: "12px" }}>
+                Cancel
+              </button>
+            </div>
+          )}
+          {showVoice && (
+            <div style={{ padding: "12px", borderBottom: "1px solid var(--border-color)" }}>
+              <VoiceRecorder onTranscript={canAddToNote ? (t) => { onAddVoiceToNote(t); setShowVoice(false); } : undefined} />
+            </div>
+          )}
+          <div style={{ flex: 1, minHeight: 0, overflow: "auto", padding: "8px" }}>
+            <DrawingCanvas onSave={canAddToNote ? onAddDrawingToNote : undefined} />
+          </div>
+        </div>
+
+        {/* Contextual toolbar – single bar, no boxes (Aa, Checklist, Grid, Paperclip, Pen, X) */}
+        <div className="split-view-toolbar">
           <button
             type="button"
-            onClick={handleAddTextToNote}
-            disabled={!hasNote || !addText.trim()}
-            style={{
-              padding: "8px 14px",
-              fontSize: "12px",
-              border: "none",
-              borderRadius: "6px",
-              background: hasNote && addText.trim() ? "var(--text-secondary)" : "var(--bg-tertiary)",
-              color: hasNote && addText.trim() ? "var(--bg-primary)" : "var(--text-secondary)",
-              cursor: hasNote && addText.trim() ? "pointer" : "not-allowed"
-            }}
+            className="split-view-toolbar-btn"
+            onClick={() => setShowAddText((v) => !v)}
+            disabled={!hasNote}
+            title="Add text"
+            aria-label="Add text"
           >
-            Add to note
+            Aa
           </button>
-        </section>
+          <button
+            type="button"
+            className="split-view-toolbar-btn"
+            onClick={() => canAddToNote && onAddTextToNote("- [ ] ")}
+            disabled={!hasNote}
+            title="Checklist"
+            aria-label="Checklist"
+          >
+            ☑
+          </button>
+          <button type="button" className="split-view-toolbar-btn" disabled title="Table" aria-label="Table">
+            ⊞
+          </button>
+          <button type="button" className="split-view-toolbar-btn" disabled title="Attachment" aria-label="Attachment">
+            📎
+          </button>
+          <button
+            type="button"
+            className="split-view-toolbar-btn"
+            onClick={() => setShowVoice((v) => !v)}
+            disabled={!hasNote}
+            title="Voice"
+            aria-label="Voice"
+          >
+            🎤
+          </button>
+          <button
+            type="button"
+            className="split-view-toolbar-btn"
+            onClick={() => { setShowAddText(false); setShowVoice(false); }}
+            title="Close panels"
+            aria-label="Close"
+          >
+            ✕
+          </button>
+        </div>
 
-        {/* Voice */}
-        <section style={{ background: "var(--bg-secondary)", padding: "12px", borderRadius: "8px", border: "1px solid var(--border-color)" }}>
-          <VoiceRecorder
-            onTranscript={canAddToNote ? onAddVoiceToNote : undefined}
-          />
-        </section>
-
-        {/* Drawing */}
-        <section style={{ background: "var(--bg-secondary)", padding: "12px", borderRadius: "8px", border: "1px solid var(--border-color)" }}>
-          <DrawingCanvas
-            onSave={canAddToNote ? onAddDrawingToNote : undefined}
-          />
-        </section>
+        {/* Tool palette – single bar, no boxes (pen, eraser, pencil, ruler, color, +) */}
+        <div className="split-view-toolbar" style={{ borderTop: "1px solid var(--border-color)" }}>
+          <button type="button" className="split-view-toolbar-btn" title="Pen" aria-label="Pen">
+            ✒
+          </button>
+          <button type="button" className="split-view-toolbar-btn" title="Marker" aria-label="Marker">
+            🖍
+          </button>
+          <button type="button" className="split-view-toolbar-btn" title="Eraser" aria-label="Eraser">
+            🧹
+          </button>
+          <button type="button" className="split-view-toolbar-btn" title="Pencil" aria-label="Pencil">
+            ✏
+          </button>
+          <button type="button" className="split-view-toolbar-btn" title="Ruler" aria-label="Ruler">
+            📏
+          </button>
+          <button type="button" className="split-view-toolbar-btn" title="Color" aria-label="Color">
+            🎨
+          </button>
+          <button type="button" className="split-view-toolbar-btn" title="More" aria-label="More">
+            +
+          </button>
+        </div>
       </div>
     </div>
   );
