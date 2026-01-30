@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useRef } from "react";
 
 const navItemStyle = (active) => ({
   display: "block",
@@ -6,7 +6,7 @@ const navItemStyle = (active) => ({
   padding: "12px 16px",
   textAlign: "left",
   border: "none",
-  background: active ? "rgba(245, 186, 19, 0.25)" : "transparent",
+  background: active ? "var(--bg-tertiary, rgba(0, 0, 0, 0.08))" : "transparent",
   color: "inherit",
   cursor: "pointer",
   fontSize: "15px",
@@ -15,6 +15,8 @@ const navItemStyle = (active) => ({
   borderRadius: "6px",
   marginBottom: "4px"
 });
+
+const DOUBLE_TAP_DELAY_MS = 300;
 
 function Header({
   navOpen,
@@ -31,40 +33,47 @@ function Header({
   onSelectEnhanced,
   onSelectSearch,
   sidebarCollapsed,
-  onSidebarCollapseToggle,
+  onBrandSingleTap,
+  onBrandDoubleTap,
   sidebar = false
 }) {
+  const lastTapRef = useRef(0);
+  const singleTapTimerRef = useRef(null);
+
   const handleNavSelect = (handler) => {
     if (typeof handler === "function") handler();
     onNavToggle(false);
   };
 
-  const handleReload = () => {
-    window.location.reload();
-  };
+  const handleBrandClick = () => {
+    const now = Date.now();
+    const isDoubleTap = now - lastTapRef.current <= DOUBLE_TAP_DELAY_MS;
+    lastTapRef.current = now;
 
-  const collapseToggle =
-    sidebar && typeof onSidebarCollapseToggle === "function" ? (
-      <button
-        type="button"
-        className="sidebar-collapse-btn"
-        onClick={onSidebarCollapseToggle}
-        aria-expanded={!sidebarCollapsed}
-        aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-        title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-      >
-        {sidebarCollapsed ? "»" : "«"}
-      </button>
-    ) : null;
+    if (isDoubleTap) {
+      if (singleTapTimerRef.current) {
+        clearTimeout(singleTapTimerRef.current);
+        singleTapTimerRef.current = null;
+      }
+      if (typeof onBrandDoubleTap === "function") onBrandDoubleTap();
+      return;
+    }
+
+    singleTapTimerRef.current = setTimeout(() => {
+      singleTapTimerRef.current = null;
+      if (typeof onBrandSingleTap === "function") onBrandSingleTap();
+    }, DOUBLE_TAP_DELAY_MS);
+  };
 
   const brandAndHamburger = (
     <>
       <button
         type="button"
         className="header-title sidebar-brand-title"
-        onClick={handleReload}
+        onClick={handleBrandClick}
         style={{ background: "none", border: "none", cursor: "pointer", font: "inherit", padding: 0 }}
-        aria-label="Reload app"
+        aria-label="Tap to open or close sidebar, double-tap to reload"
+        title="Tap to open/close sidebar, double-tap to reload"
       >
         yApSs
       </button>
@@ -79,7 +88,6 @@ function Header({
         <span className="hamburger-line" />
         <span className="hamburger-line" />
       </button>
-      {collapseToggle}
     </>
   );
 

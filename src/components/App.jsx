@@ -516,7 +516,8 @@ function App() {
               setNavOpen(open);
             }}
             sidebarCollapsed={sidebarCollapsed}
-            onSidebarCollapseToggle={() => setSidebarCollapsed((c) => !c)}
+            onBrandSingleTap={() => setSidebarCollapsed((c) => !c)}
+            onBrandDoubleTap={() => window.location.reload()}
             activeView={activeView}
             onSelectNotes={() => { closeAllModals(); setNavOpen(false); }}
             onSelectDashboard={() => { setShowTrash(false); setShowExportImport(false); setShowDeadlines(false); setShowDashboard(true); }}
