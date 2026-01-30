@@ -1,4 +1,5 @@
 import React, { useRef } from "react";
+import NotificationCenter from "./NotificationCenter";
 
 const navItemStyle = (active) => ({
   display: "block",
@@ -35,7 +36,11 @@ function Header({
   sidebarCollapsed,
   onBrandSingleTap,
   onBrandDoubleTap,
-  sidebar = false
+  sidebar = false,
+  notificationUnreadCount = 0,
+  showNotificationPanel = false,
+  onNotificationPanelToggle,
+  onNotificationsRefresh
 }) {
   const lastTapRef = useRef(0);
   const singleTapTimerRef = useRef(null);
@@ -93,8 +98,59 @@ function Header({
 
   if (sidebar) {
     return (
-      <div className="sidebar-header">
+      <div className="sidebar-header" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", position: "relative" }}>
         {brandAndHamburger}
+        {typeof onNotificationPanelToggle === "function" && (
+          <div style={{ position: "relative", marginLeft: "auto", marginRight: "8px" }}>
+            <button
+              type="button"
+              onClick={onNotificationPanelToggle}
+              aria-label={showNotificationPanel ? "Close notifications" : "Open notifications"}
+              aria-expanded={showNotificationPanel}
+              style={{
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                padding: "8px",
+                fontSize: "20px",
+                position: "relative"
+              }}
+            >
+              <span role="img" aria-hidden="true">🔔</span>
+              {notificationUnreadCount > 0 && (
+                <span
+                  style={{
+                    position: "absolute",
+                    top: 2,
+                    right: 2,
+                    minWidth: "18px",
+                    height: "18px",
+                    borderRadius: "9px",
+                    background: "#e53935",
+                    color: "#fff",
+                    fontSize: "11px",
+                    fontWeight: "bold",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    padding: "0 4px"
+                  }}
+                >
+                  {notificationUnreadCount > 99 ? "99+" : notificationUnreadCount}
+                </span>
+              )}
+            </button>
+            <NotificationCenter
+              isOpen={showNotificationPanel}
+              onClose={() => typeof onNotificationPanelToggle === "function" && onNotificationPanelToggle(false)}
+              onMarkRead={() => typeof onNotificationsRefresh === "function" && onNotificationsRefresh()}
+              onMarkAllRead={() => typeof onNotificationsRefresh === "function" && onNotificationsRefresh()}
+              unreadCount={notificationUnreadCount}
+              notifications={[]}
+              onRefresh={onNotificationsRefresh}
+            />
+          </div>
+        )}
         {navOpen && (
           <>
             <div

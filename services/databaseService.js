@@ -1,4 +1,5 @@
 const Note = require("../models/Note");
+const Notification = require("../models/Notification");
 const { Op } = require("sequelize");
 const { sequelize } = require("../config/database");
 
@@ -219,6 +220,7 @@ class DatabaseService {
   async syncDatabase(force = false, alter = true) {
     try {
       await Note.sync({ force, alter });
+      await Notification.sync({ force, alter });
       console.log("Database tables synced successfully");
       return true;
     } catch (error) {

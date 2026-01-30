@@ -27,6 +27,7 @@ const calendarService = require("./services/calendarService");
 const emailService = require("./services/emailService");
 const cloudStorageService = require("./services/cloudStorageService");
 const taskService = require("./services/taskService");
+const notificationService = require("./services/notificationService");
 const cron = require("node-cron");
 
 const app = Express();
@@ -97,7 +98,20 @@ function broadcastNoteUpdate(updateType, noteData) {
     updateType: updateType, // 'created', 'updated', 'deleted'
     data: noteData
   });
-  
+
+  wss.clients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(message);
+    }
+  });
+}
+
+// Broadcast new notification to all connected clients (in-app delivery)
+function broadcastNotification(notification) {
+  const message = JSON.stringify({
+    type: "notification",
+    data: notification
+  });
   wss.clients.forEach((client) => {
     if (client.readyState === WebSocket.OPEN) {
       client.send(message);
@@ -466,7 +480,14 @@ app.post('/api/notes/import', async (request, response) => {
           tags: note.tags || [],
           priority: note.priority || "medium",
           isPinned: note.isPinned || false,
-          isArchived: note.isArchived || false
+          isArchived: note.isArchived || false,
+          deadline: note.deadline || null,
+          news: note.news || null,
+          financial: note.financial || null,
+          social: note.social || null,
+          intelligence: note.intelligence || null,
+          attachments: note.attachments || [],
+          drawings: note.drawings || []
         });
         importedCount++;
       } catch (error) {
@@ -1217,6 +1238,76 @@ app.post('/api/tasks/:platform/create', async (request, response) => {
   }
 });
 
+/**
+ * Notifications (in-app delivery)
+ */
+app.post('/api/notifications', async (request, response) => {
+  try {
+    const { type = "info", title, body, noteId, link } = request.body || {};
+    if (!title) {
+      return response.status(400).json({ message: "title is required" });
+    }
+    const created = await notificationService.create({ type, title, body, noteId, link });
+    const json = created.toJSON ? created.toJSON() : created;
+    broadcastNotification(json);
+    response.status(201).json(json);
+  } catch (error) {
+    console.error("Error creating notification", error);
+    response.status(500).send({ message: "Internal Server Error" });
+  }
+});
+
+app.get('/api/notifications', async (request, response) => {
+  try {
+    const { unreadOnly } = request.query;
+    const list = await notificationService.getNotifications({
+      unreadOnly: unreadOnly === "true",
+      limit: 100
+    });
+    response.json(list);
+  } catch (error) {
+    console.error("Error getting notifications", error);
+    response.status(500).send({ message: "Internal Server Error" });
+  }
+});
+
+app.get('/api/notifications/unread-count', async (request, response) => {
+  try {
+    const count = await notificationService.getUnreadCount();
+    response.json({ count });
+  } catch (error) {
+    console.error("Error getting unread count", error);
+    response.status(500).send({ message: "Internal Server Error" });
+  }
+});
+
+app.patch('/api/notifications/:id/read', async (request, response) => {
+  try {
+    const id = parseInt(request.params.id);
+    if (isNaN(id)) {
+      return response.status(400).send({ message: "Invalid ID" });
+    }
+    const updated = await notificationService.markRead(id);
+    if (!updated) {
+      return response.status(404).send({ message: "Notification not found" });
+    }
+    response.json(updated);
+  } catch (error) {
+    console.error("Error marking notification read", error);
+    response.status(500).send({ message: "Internal Server Error" });
+  }
+});
+
+app.patch('/api/notifications/read-all', async (request, response) => {
+  try {
+    const result = await notificationService.markAllRead();
+    response.json(result);
+  } catch (error) {
+    console.error("Error marking all read", error);
+    response.status(500).send({ message: "Internal Server Error" });
+  }
+});
+
 // Catch-all to serve React app (non-API routes)
 app.get("*", (request, response) => {
   if (request.path.startsWith("/api")) {
@@ -1227,16 +1318,36 @@ app.get("*", (request, response) => {
 
 // ==================== CRON JOBS ====================
 
-// Check deadlines every hour
+// Check deadlines every hour: create in-app notifications and broadcast
 cron.schedule('0 * * * *', async () => {
   try {
     const overdue = await deadlineService.getOverdueNotes();
     const upcoming = await deadlineService.getUpcomingDeadlines(24);
-    
-    // Send reminders for upcoming deadlines
+
+    for (const note of overdue) {
+      const noteData = note.toJSON ? note.toJSON() : note;
+      const created = await notificationService.create({
+        type: "deadline_overdue",
+        title: "Deadline overdue",
+        body: `"${noteData.title || "Note"}" was due ${new Date(noteData.deadline.date).toLocaleString()}.`,
+        noteId: noteData.id || noteData._id,
+        link: null
+      });
+      broadcastNotification(created.toJSON ? created.toJSON() : created);
+      await deadlineService.sendReminder(noteData);
+    }
+
     for (const note of upcoming) {
-      const noteData = note.toJSON();
+      const noteData = note.toJSON ? note.toJSON() : note;
       if (noteData.deadline?.reminder?.enabled) {
+        const created = await notificationService.create({
+          type: "deadline_upcoming",
+          title: "Deadline soon",
+          body: `"${noteData.title || "Note"}" is due ${new Date(noteData.deadline.date).toLocaleString()}.`,
+          noteId: noteData.id || noteData._id,
+          link: null
+        });
+        broadcastNotification(created.toJSON ? created.toJSON() : created);
         await deadlineService.sendReminder(noteData);
       }
     }

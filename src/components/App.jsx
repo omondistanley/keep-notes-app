@@ -60,11 +60,32 @@ function App() {
   const [navOpen, setNavOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [topMoversLoadingId, setTopMoversLoadingId] = useState(null);
+  const [predictiveSearchQ, setPredictiveSearchQ] = useState("");
+  const [predictiveSearchResults, setPredictiveSearchResults] = useState([]);
+  const [predictiveLinking, setPredictiveLinking] = useState(false);
+  const [nyuziSearchQ, setNyuziSearchQ] = useState("");
+  const [nyuziSearchResults, setNyuziSearchResults] = useState([]);
+  const [nyuziLinking, setNyuziLinking] = useState(false);
   // eslint-disable-next-line no-unused-vars
   const [availableTags, setAvailableTags] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [notesPerPage] = useState(20);
   const [selectedNoteIdForView, setSelectedNoteIdForView] = useState(null);
+  const [notificationUnreadCount, setNotificationUnreadCount] = useState(0);
+  const [showNotificationPanel, setShowNotificationPanel] = useState(false);
+  const [toastNotification, setToastNotification] = useState(null);
+
+  const fetchNotificationCount = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/notifications/unread-count`);
+      if (res.ok) {
+        const { count } = await res.json();
+        setNotificationUnreadCount(count);
+      }
+    } catch (e) {
+      // ignore
+    }
+  }, []);
 
   /**
    * Fetches the notes from the API when the component mounts. 
@@ -116,7 +137,8 @@ function App() {
   useEffect(() => {
     fetchNotes();
     fetchTags();
-  }, [fetchNotes, fetchTags]);
+    fetchNotificationCount();
+  }, [fetchNotes, fetchTags, fetchNotificationCount]);
 
   // WebSocket for real-time updates
   const handleWebSocketMessage = useCallback((data) => {
@@ -124,7 +146,17 @@ function App() {
       fetchNotes();
       fetchTags();
     }
+    if (data.type === "notification" && data.data) {
+      setNotificationUnreadCount((prev) => prev + 1);
+      setToastNotification(data.data);
+    }
   }, [fetchNotes, fetchTags]);
+
+  useEffect(() => {
+    if (!toastNotification) return;
+    const t = setTimeout(() => setToastNotification(null), 4000);
+    return () => clearTimeout(t);
+  }, [toastNotification]);
 
   useWebSocket(WS_URL, handleWebSocketMessage);
 
@@ -217,6 +249,60 @@ function App() {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.message || "Failed to update all");
     await fetchNotes();
+  }, [fetchNotes]);
+
+  const searchPredictiveMarkets = useCallback(async (q) => {
+    if (!q.trim()) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/predictive/search?q=${encodeURIComponent(q.trim())}`);
+      const data = await res.json().catch(() => ({}));
+      setPredictiveSearchResults(data.markets || []);
+    } catch (e) {
+      setPredictiveSearchResults([]);
+    }
+  }, []);
+
+  const linkPredictiveMarket = useCallback(async (noteId, platform, marketId) => {
+    setPredictiveLinking(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/notes/${noteId}/link-predictive-market`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ platform, marketId })
+      });
+      if (res.ok) {
+        await fetchNotes();
+      }
+    } finally {
+      setPredictiveLinking(false);
+    }
+  }, [fetchNotes]);
+
+  const searchNyuziMarkets = useCallback(async (q) => {
+    if (!q.trim()) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/nyuzi/search?q=${encodeURIComponent(q.trim())}`);
+      const data = await res.json().catch(() => ({}));
+      setNyuziSearchResults(Array.isArray(data) ? data : data.markets || []);
+    } catch (e) {
+      setNyuziSearchResults([]);
+    }
+  }, []);
+
+  const linkNyuziMarket = useCallback(async (noteId, marketId) => {
+    setNyuziLinking(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/notes/${noteId}/nyuzi-market`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ marketId })
+      });
+      if (res.ok) {
+        await fetchNotes();
+      }
+    } finally {
+      setNyuziLinking(false);
+    }
   }, [fetchNotes]);
 
   const loadFinancialChart = useCallback(async (symbol, range = "1mo") => {
@@ -531,6 +617,29 @@ function App() {
 
   return (
     <div style={{ background: theme === "dark" ? "#1a1a1a" : "#eee", minHeight: "100vh" }}>
+      {toastNotification && (
+        <div
+          role="alert"
+          aria-live="polite"
+          style={{
+            position: "fixed",
+            bottom: 24,
+            right: 24,
+            maxWidth: "360px",
+            padding: "12px 16px",
+            background: "var(--bg-secondary)",
+            border: "1px solid var(--border-color)",
+            borderRadius: "8px",
+            boxShadow: "0 4px 20px var(--shadow)",
+            zIndex: 9999,
+            fontSize: "14px",
+            color: "var(--text-primary)"
+          }}
+        >
+          <strong>{toastNotification.title}</strong>
+          {toastNotification.body && <div style={{ marginTop: "4px", fontSize: "13px", color: "var(--text-secondary)" }}>{toastNotification.body}</div>}
+        </div>
+      )}
       <div className="app-layout">
         <aside className={`app-sidebar ${sidebarCollapsed ? "app-sidebar--collapsed" : ""}`} aria-label="Sidebar">
           <Header
@@ -557,6 +666,10 @@ function App() {
             onSelectDraw={() => { setShowDrawing(true); setShowVoiceRecorder(false); }}
             onSelectEnhanced={() => { setShowEnhancedForm(true); setSelectedNoteId(null); }}
             onSelectSearch={() => setTimeout(() => searchInputRef.current?.focus(), 0)}
+            notificationUnreadCount={notificationUnreadCount}
+            showNotificationPanel={showNotificationPanel}
+            onNotificationPanelToggle={() => setShowNotificationPanel((v) => !v)}
+            onNotificationsRefresh={fetchNotificationCount}
           />
           {!sidebarCollapsed && (
             <>
@@ -1074,6 +1187,59 @@ function App() {
                         </ul>
                       </section>
                     )}
+                    {/* Link Predictive / Nyuzi */}
+                    <section style={{ marginTop: "20px", paddingTop: "16px", borderTop: "1px solid var(--border-color)" }}>
+                      <h3 style={{ fontSize: "14px", marginBottom: "8px", color: "var(--text-primary)" }}>Link Predictive / Nyuzi</h3>
+                      <p style={{ fontSize: "12px", color: "var(--text-secondary)", marginBottom: "12px" }}>Search and link prediction markets to this note.</p>
+                      <div style={{ marginBottom: "12px" }}>
+                        <label style={{ display: "block", fontSize: "12px", marginBottom: "4px", color: "var(--text-secondary)" }}>Predictive (Polymarket, Kalshi, PredictIt)</label>
+                        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                          <input
+                            type="text"
+                            value={predictiveSearchQ}
+                            onChange={(e) => setPredictiveSearchQ(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === "Enter") searchPredictiveMarkets(predictiveSearchQ); }}
+                            placeholder="Search markets..."
+                            style={{ flex: 1, minWidth: "120px", padding: "6px 10px", fontSize: "13px", border: "1px solid var(--border-color)", borderRadius: "4px" }}
+                          />
+                          <button type="button" onClick={() => searchPredictiveMarkets(predictiveSearchQ)} style={{ padding: "6px 12px", background: "#1976d2", color: "#fff", border: "none", borderRadius: "4px", cursor: "pointer", fontSize: "12px" }}>Search</button>
+                        </div>
+                        {predictiveSearchResults.length > 0 && (
+                          <ul style={{ listStyle: "none", padding: 0, margin: "8px 0 0", fontSize: "12px", maxHeight: "120px", overflowY: "auto" }}>
+                            {predictiveSearchResults.slice(0, 5).map((m, i) => (
+                              <li key={i} style={{ padding: "6px 0", borderBottom: "1px solid var(--border-color)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" }}>
+                                <span>{m.question || m.platform || "Market"}</span>
+                                <button type="button" disabled={predictiveLinking} onClick={() => linkPredictiveMarket(openFinancialModalNoteId, m.platform || "polymarket", m.marketId || m.id)} style={{ padding: "4px 8px", fontSize: "11px", background: "#2e7d32", color: "#fff", border: "none", borderRadius: "4px", cursor: predictiveLinking ? "wait" : "pointer" }}>Link</button>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                      <div>
+                        <label style={{ display: "block", fontSize: "12px", marginBottom: "4px", color: "var(--text-secondary)" }}>Nyuzi</label>
+                        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                          <input
+                            type="text"
+                            value={nyuziSearchQ}
+                            onChange={(e) => setNyuziSearchQ(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === "Enter") searchNyuziMarkets(nyuziSearchQ); }}
+                            placeholder="Search Nyuzi..."
+                            style={{ flex: 1, minWidth: "120px", padding: "6px 10px", fontSize: "13px", border: "1px solid var(--border-color)", borderRadius: "4px" }}
+                          />
+                          <button type="button" onClick={() => searchNyuziMarkets(nyuziSearchQ)} style={{ padding: "6px 12px", background: "#1976d2", color: "#fff", border: "none", borderRadius: "4px", cursor: "pointer", fontSize: "12px" }}>Search</button>
+                        </div>
+                        {nyuziSearchResults.length > 0 && (
+                          <ul style={{ listStyle: "none", padding: 0, margin: "8px 0 0", fontSize: "12px", maxHeight: "120px", overflowY: "auto" }}>
+                            {nyuziSearchResults.slice(0, 5).map((m, i) => (
+                              <li key={i} style={{ padding: "6px 0", borderBottom: "1px solid var(--border-color)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" }}>
+                                <span>{m.title || m.id || "Market"}</span>
+                                <button type="button" disabled={nyuziLinking} onClick={() => linkNyuziMarket(openFinancialModalNoteId, m.id || m.marketId)} style={{ padding: "4px 8px", fontSize: "11px", background: "#2e7d32", color: "#fff", border: "none", borderRadius: "4px", cursor: nyuziLinking ? "wait" : "pointer" }}>Link</button>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    </section>
                   </>
                 )}
               </div>

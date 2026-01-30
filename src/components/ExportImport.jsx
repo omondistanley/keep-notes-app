@@ -157,6 +157,9 @@ const ExportImport = ({ notes, onImport }) => {
 
       <div>
         <h4 style={{ marginBottom: "10px", color: "var(--text-primary)" }}>Import</h4>
+        <p style={{ fontSize: "12px", color: "var(--text-secondary)", marginBottom: "8px" }}>
+          Import preserves integrations (deadline, news, financial, social). Use JSON exported from this app.
+        </p>
         <input
           type="file"
           accept=".json"

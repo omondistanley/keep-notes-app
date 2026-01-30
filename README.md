@@ -83,7 +83,7 @@ The app works **without any API keys** using free sources:
 - **Crypto:** CoinGecko
 - **Social:** Nitter/Reddit RSS
 
-Copy `.env.example` to `.env` and add keys only if you want more sources:
+Copy `.env.example` to `.env` and add keys only if you want more sources (see `.env.example` for all optional variables):
 
 | Category | Env variable | Service |
 |----------|--------------|---------|
@@ -116,15 +116,39 @@ Test integrations (with server running): `node scripts/test-integrations.js`
 
 ## Backend (server.js)
 
+### Notes
 - **POST** `/api/notes/AddNote` — create note
-- **GET** `/api/notes/GetNotes` — list notes
+- **GET** `/api/notes/GetNotes` — list notes (see [filters & pagination](#getnotes--search-filters-and-pagination) below)
+- **GET** `/api/notes/search?q=...` — search notes by query (same query params as GetNotes)
 - **PUT** `/api/notes/UpdateNote/:id` — update note
 - **DELETE** `/api/notes/DeleteNote/:id` — delete note
+- **GET** `/api/notes/export` — export all notes as JSON (includes integrations)
+- **POST** `/api/notes/import` — import notes from JSON (preserves deadline, news, financial, social, etc.)
+
+### Integrations
 - **POST** `/api/notes/:id/fetch-news` — fetch news for note
 - **POST** `/api/notes/:id/update-financial` — update financial data
 - **POST** `/api/notes/:id/fetch-tweets` — fetch social (X + Reddit when enabled)
+- **POST** `/api/notes/:id/update-all` — refresh news + financial + social + intelligence
+- **GET** `/api/notes/:id/top-movers` — load top 100 movers for note
 - **GET** `/api/notes/upcoming-deadlines?days=14` — upcoming deadlines
-- **GET** `/api/notes/export` — export all notes as JSON
+- **GET** `/api/notes/overdue` — overdue notes
+- **PATCH** `/api/notes/:id/deadline-status` — set deadline status (body: `{ status }`)
+- **GET** `/api/predictive/search?q=...` — search predictive markets
+- **POST** `/api/notes/:id/link-predictive-market` — link market (body: `{ platform, marketId }`)
+- **GET** `/api/nyuzi/search?q=...` — search Nyuzi markets
+- **POST** `/api/notes/:id/nyuzi-market` — link Nyuzi market (body: `{ marketId }`)
+
+### Notifications (in-app)
+- **GET** `/api/notifications?unreadOnly=true` — list notifications
+- **GET** `/api/notifications/unread-count` — unread count
+- **PATCH** `/api/notifications/:id/read` — mark one read
+- **PATCH** `/api/notifications/read-all` — mark all read
+
+### GetNotes / search – filters and pagination
+- **Query params (optional):** `tags` (array or repeated), `priority`, `isArchived`, `isPinned`, `sortBy` (`title` \| `createdAt` \| `updatedAt` \| `priority`), `sortOrder` (`asc` \| `desc`), `page`, `limit`.
+- **Search** (`/api/notes/search`): same params plus `q` for full-text search in title, content, tags.
+- **Pagination:** Frontend sends `page` and `limit`; backend returns all matching notes (server-side pagination can be added later). Sorted notes are returned; pinned notes appear first.
 
 ---
 

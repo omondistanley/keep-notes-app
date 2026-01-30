@@ -180,6 +180,22 @@ const IntegrationDashboard = () => {
           </div>
         </div>
       </div>
+
+      <div style={{ marginTop: "24px", padding: "12px", background: "var(--bg-tertiary)", borderRadius: "6px", border: "1px dashed var(--border-color)" }}>
+        <h3 style={{ marginBottom: "8px", fontSize: "14px", color: "var(--text-primary)" }}>More integrations (coming soon)</h3>
+        <p style={{ fontSize: "12px", color: "var(--text-secondary)", marginBottom: "10px" }}>
+          Calendar, Email, Cloud Storage, and Task Management will connect to real providers (Google, Outlook, Drive, Todoist, etc.) in a future release.
+        </p>
+        <ul style={{ fontSize: "12px", color: "var(--text-secondary)", margin: 0, paddingLeft: "18px" }}>
+          <li>Calendar — Google Calendar, Outlook</li>
+          <li>Email — parse &amp; email-to-note</li>
+          <li>Cloud — Google Drive, Dropbox, OneDrive</li>
+          <li>Tasks — Todoist, Asana, Jira</li>
+        </ul>
+        <p style={{ fontSize: "11px", color: "var(--text-secondary)", marginTop: "8px", marginBottom: 0 }}>
+          See <code style={{ background: "var(--bg-secondary)", padding: "1px 4px", borderRadius: "3px" }}>INTEGRATIONS-ROADMAP.md</code> in the repo for details.
+        </p>
+      </div>
     </div>
   );
 };

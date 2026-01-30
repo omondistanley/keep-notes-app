@@ -327,6 +327,41 @@ function Note(props) {
           </div>
         </div>
       )}
+
+      {/* Predictive markets (Polymarket, Kalshi, PredictIt) */}
+      {props.financial?.predictive?.markets && Array.isArray(props.financial.predictive.markets) && props.financial.predictive.markets.length > 0 && (
+        <div style={sectionStyle}>
+          <strong><span role="img" aria-label="Predictive">📊</span> Predictive Markets</strong>
+          <div style={{ marginTop: "6px", fontSize: "12px" }}>
+            {props.financial.predictive.markets.slice(0, 3).map((m, i) => (
+              <div key={i} style={{ marginBottom: "6px", padding: "6px", background: "var(--bg-secondary, #fff)", borderRadius: "4px" }}>
+                <span style={{ fontWeight: "bold" }}>{m.platform || "Market"}</span>
+                {m.question && <div style={{ marginTop: "2px", color: "var(--text-secondary)" }}>{m.question}</div>}
+                {m.outcomes && m.outcomes[0] && (
+                  <span style={{ fontSize: "11px", marginLeft: "4px" }}>Yes {((m.outcomes[0].probability ?? m.outcomes[0].price) * 100).toFixed(0)}%</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Nyuzi market intelligence */}
+      {props.financial?.predictive?.nyuzi?.enabled && (
+        <div style={sectionStyle}>
+          <strong><span role="img" aria-label="Nyuzi">📈</span> Nyuzi</strong>
+          {props.financial.predictive.nyuzi.earlyMarketIndicator?.description && (
+            <div style={{ marginTop: "6px", fontSize: "12px", color: "var(--text-secondary)" }}>{props.financial.predictive.nyuzi.earlyMarketIndicator.description}</div>
+          )}
+          {props.financial.predictive.nyuzi.catalysts && props.financial.predictive.nyuzi.catalysts.length > 0 && (
+            <div style={{ marginTop: "6px", fontSize: "11px" }}>
+              {props.financial.predictive.nyuzi.catalysts.slice(0, 2).map((c, i) => (
+                <div key={i}>{c.description || c.type}</div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </>
   );
 
