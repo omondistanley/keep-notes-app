@@ -1235,13 +1235,13 @@ function App() {
       })()}
       
       {showVoiceRecorder && (
-        <div style={{ width: "600px", margin: "20px auto" }}>
+        <div className="voice-recorder-container" style={{ width: "100%", maxWidth: "600px", margin: "20px auto" }}>
           <VoiceRecorder onTranscript={handleVoiceTranscript} />
         </div>
       )}
       
       {showDrawing && (
-        <div style={{ width: "900px", margin: "20px auto" }}>
+        <div className="drawing-canvas-container" style={{ width: "100%", maxWidth: "900px", margin: "20px auto" }}>
           <DrawingCanvas onSave={handleDrawingSave} />
         </div>
       )}

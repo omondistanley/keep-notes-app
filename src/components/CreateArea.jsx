@@ -29,7 +29,8 @@ const noteStyle = {
 
 const noteFormat = {
   position: "relative",
-  width: "480px",
+  width: "100%",
+  maxWidth: "480px",
   margin: "30px auto 20px auto",
   background: "#fff",
   padding: "15px",
@@ -206,7 +207,7 @@ function CreateArea(props) {
   }
 
   return (
-    <div style={noteFormat}>
+    <div className="create-area" style={noteFormat}>
       {/* Form: only fields that can trigger submit. Integrations are outside so they never submit. */}
       <form onSubmit={submitNote} style={{ margin: 0, padding: 0 }}>
         <input
@@ -239,7 +240,7 @@ function CreateArea(props) {
             </ol>
           )}
           {note.tags.length < MAX_TAGS && (
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "6px" }}>
+            <div className="create-area-tag-row" style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "6px" }}>
               <input
                 type="text"
                 value={tagInput}

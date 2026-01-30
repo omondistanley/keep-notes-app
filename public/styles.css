@@ -3,13 +3,29 @@
   margin: 0;
   box-sizing: border-box;
 }
+
 html {
   font-family: "Montserrat", sans-serif;
+  overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
 }
+
+/* Responsive spacing: works on phone, tablet, desktop */
+:root {
+  --content-padding: 16px;
+  --content-padding-h: 16px;
+  --topbar-padding-h: 12px;
+  --topbar-logo-max: 120px;
+  --form-max-w: 600px;
+  --create-max-w: 480px;
+}
+
 body {
   background: #eee;
-  padding: 0 16px;
+  padding: 0 var(--content-padding-h);
   transition: background-color 0.3s ease, color 0.3s ease;
+  overflow-x: hidden;
+  min-width: 0;
 }
 
 /* Dark Mode Variables */
@@ -44,7 +60,10 @@ body {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  min-height: 100dvh;
   background: var(--bg-primary, #eee);
+  overflow-x: hidden;
+  min-width: 0;
 }
 
 /* Compact top bar: hamburger left, title center, bell + theme right */
@@ -55,7 +74,8 @@ body {
   justify-content: space-between;
   height: 56px;
   min-height: 56px;
-  padding: 0 12px 0 8px;
+  padding-left: max(var(--topbar-padding-h), env(safe-area-inset-left));
+  padding-right: max(var(--topbar-padding-h), env(safe-area-inset-right));
   gap: 8px;
   background: var(--bg-secondary, #fff);
   border-bottom: 1px solid var(--border-color, #ddd);
@@ -95,7 +115,7 @@ body {
 .app-top-bar .top-bar-logo {
   height: 36px;
   width: auto;
-  max-width: 120px;
+  max-width: var(--topbar-logo-max);
   object-fit: contain;
   display: block;
 }
@@ -447,14 +467,17 @@ body {
   overflow-x: hidden;
   overflow-y: auto;
   padding-bottom: 60px;
-  padding-left: 16px;
-  padding-right: 16px;
+  padding-left: max(var(--content-padding-h), env(safe-area-inset-left));
+  padding-right: max(var(--content-padding-h), env(safe-area-inset-right));
+  min-width: 0;
 }
 
 .app-main-content {
   max-width: 900px;
+  width: 100%;
   margin: 0 auto;
   padding-top: 20px;
+  min-width: 0;
 }
 
 .app-main-placeholder {
@@ -655,10 +678,52 @@ footer p {
   color: #666;
 }
 
-/* Mobile Responsive Styles */
+/* ----- Breakpoints: small phone → phone → tablet → desktop ----- */
+
+/* Extra-small phone (e.g. iPhone SE, narrow devices) */
+@media screen and (max-width: 400px) {
+  :root {
+    --content-padding-h: 6px;
+    --topbar-padding-h: 6px;
+    --topbar-logo-max: 80px;
+  }
+
+  .app-main-content {
+    padding-top: 10px;
+  }
+
+  .enhanced-note-form > div:nth-child(2) {
+    padding: 10px 6px !important;
+  }
+}
+
+/* Phone (and small tablet in portrait) */
 @media screen and (max-width: 768px) {
+  :root {
+    --content-padding-h: 8px;
+    --topbar-padding-h: 8px;
+    --topbar-logo-max: 100px;
+  }
+
   body {
-    padding: 0 8px;
+    padding-left: max(var(--content-padding-h), env(safe-area-inset-left));
+    padding-right: max(var(--content-padding-h), env(safe-area-inset-right));
+  }
+
+  .app-main {
+    overflow-x: hidden;
+  }
+
+  .app-main-content {
+    padding-top: 12px;
+  }
+
+  .create-area {
+    box-sizing: border-box;
+  }
+
+  .nav-drawer--left {
+    padding-top: max(16px, env(safe-area-inset-top));
   }
 
   header {
@@ -728,9 +793,31 @@ footer p {
 
   /* Enhanced note form - full width on mobile */
   .enhanced-note-form {
-    width: 95% !important;
-    max-width: 95% !important;
+    width: 100% !important;
+    max-width: 100% !important;
     margin: 10px auto !important;
+    padding-left: 4px;
+    padding-right: 4px;
+    box-sizing: border-box;
+  }
+
+  .enhanced-note-form > div:first-of-type {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .enhanced-note-form > div:nth-child(2) {
+    padding: 12px 8px !important;
+  }
+
+  .enhanced-note-form input[type="text"],
+  .enhanced-note-form textarea {
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .enhanced-note-form div[style*="display: flex"] {
+    flex-wrap: wrap;
   }
 
   /* Drawing canvas - responsive */
@@ -753,10 +840,24 @@ footer p {
     margin: 10px auto !important;
   }
 
-  /* Create area - full width */
+  /* Create area - full width, inputs use full width on narrow screens */
   .create-area {
     width: 100% !important;
     max-width: 100% !important;
+  }
+
+  .create-area input[type="text"],
+  .create-area input[type="datetime-local"] {
+    max-width: 100% !important;
+  }
+
+  .create-area .create-area-tag-row {
+    flex-wrap: wrap;
+  }
+
+  .create-area .create-area-tag-row input {
+    flex: 1 1 auto;
+    min-width: 0;
   }
 
   /* Note actions - wrap buttons */
@@ -789,8 +890,19 @@ footer p {
   }
 }
 
-/* Tablet Styles */
+/* Tablet (e.g. iPad) – balanced width, no overflow */
 @media screen and (min-width: 769px) and (max-width: 1024px) {
+  :root {
+    --content-padding-h: 20px;
+    --topbar-padding-h: 12px;
+    --topbar-logo-max: 120px;
+  }
+
+  .app-main-content {
+    max-width: 720px;
+    padding-top: 20px;
+  }
+
   .note {
     width: calc(50% - 32px);
     max-width: 300px;
@@ -806,12 +918,24 @@ footer p {
   }
 }
 
-/* Touch-friendly improvements */
+/* Desktop – comfortable max-width and padding */
+@media screen and (min-width: 1025px) {
+  :root {
+    --content-padding-h: 24px;
+    --topbar-padding-h: 12px;
+    --topbar-logo-max: 140px;
+  }
+
+  .app-main-content {
+    max-width: 900px;
+  }
+}
+
+/* Touch-friendly improvements (phone/tablet) */
 @media (hover: none) and (pointer: coarse) {
-  /* Larger touch targets */
+  /* Minimum tap height; width follows content so icon buttons stay compact */
   button {
     min-height: 44px;
-    min-width: 44px;
   }
 
   /* Remove hover effects on touch devices */

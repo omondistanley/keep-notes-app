@@ -88,8 +88,9 @@ const EnhancedNoteForm = ({ note = null, onSave, onCancel }) => {
   };
 
   return (
-    <div style={{
-      width: "600px",
+    <div className="enhanced-note-form" style={{
+      width: "100%",
+      maxWidth: "600px",
       margin: "20px auto",
       background: "var(--bg-secondary)",
       borderRadius: "8px",
