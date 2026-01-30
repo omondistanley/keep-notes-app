@@ -3,53 +3,225 @@
  *
  * @returns {JSX.Element} The rendered React component.
  */
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import Header from "./Header";
 import Footer from "./Footer";
 import Note from "./Note";
 import CreateArea from "./CreateArea";
+import TrashView from "./TrashView";
+import ExportImport from "./ExportImport";
+import TemplateSelector from "./TemplateSelector";
+import ThemeToggle from "./ThemeToggle";
+import IntegrationDashboard from "./IntegrationDashboard";
+import CommandPalette from "./CommandPalette";
+import SplitView from "./SplitView";
+import VoiceRecorder from "./VoiceRecorder";
+import DrawingCanvas from "./DrawingCanvas";
+import FocusMode from "./FocusMode";
+import EnhancedNoteForm from "./EnhancedNoteForm";
+import DeadlinesView from "./DeadlinesView";
+import useWebSocket from "../hooks/useWebSocket";
+import { useTheme } from "../contexts/ThemeContext";
+
+const API_BASE = "http://localhost:3050";
 
 function App() {
+  const { theme, toggleTheme } = useTheme();
+  const searchInputRef = useRef(null);
   const [notes, setNotes] = useState([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState("updatedAt");
+  const [sortOrder, setSortOrder] = useState("desc");
+  const [filterTags, setFilterTags] = useState([]);
+  const [filterPriority, setFilterPriority] = useState("");
+  const [showArchived, setShowArchived] = useState(false);
+  const [showTrash, setShowTrash] = useState(false);
+  const [showExportImport, setShowExportImport] = useState(false);
+  const [showDashboard, setShowDashboard] = useState(false);
+  const [showDeadlines, setShowDeadlines] = useState(false);
+  const [showCommandPalette, setShowCommandPalette] = useState(false);
+  const [showSplitView, setShowSplitView] = useState(false);
+  const [showFocusMode, setShowFocusMode] = useState(false);
+  const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
+  const [showDrawing, setShowDrawing] = useState(false);
+  const [showEnhancedForm, setShowEnhancedForm] = useState(false);
+  const [selectedNoteId, setSelectedNoteId] = useState(null);
+  const [availableTags, setAvailableTags] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [notesPerPage] = useState(20);
 
   /**
    * Fetches the notes from the API when the component mounts. 
    * Makes use of the get from the server.jsx file in the connection and database. 
    */
-  useEffect(() => {
-    async function fetchNotes() {
-      try {
-        const response = await fetch("http://localhost:3050/api/notes/GetNotes");
-
-        if (response.ok) {
-          const fetchedNotes = await response.json();
-          setNotes(fetchedNotes);
-        } else {
-          console.error("Failed to fetch notes");
-        }
-      } catch (error) {
-        console.error("Error fetching notes", error);
+  const fetchNotes = useCallback(async () => {
+    try {
+      const params = new URLSearchParams();
+      if (searchQuery) params.append("q", searchQuery);
+      if (filterTags.length > 0) {
+        filterTags.forEach(tag => params.append("tags", tag));
       }
-    }
+      if (filterPriority) params.append("priority", filterPriority);
+      if (showArchived) params.append("isArchived", "true");
+      params.append("sortBy", sortBy);
+      params.append("sortOrder", sortOrder);
+      params.append("page", currentPage);
+      params.append("limit", 20);
 
-    fetchNotes();
+      const url = searchQuery 
+        ? `http://localhost:3050/api/notes/search?${params.toString()}`
+        : `http://localhost:3050/api/notes/GetNotes?${params.toString()}`;
+
+      const response = await fetch(url);
+
+      if (response.ok) {
+        const fetchedNotes = await response.json();
+        setNotes(fetchedNotes);
+      } else {
+        console.error("Failed to fetch notes");
+      }
+    } catch (error) {
+      console.error("Error fetching notes", error);
+    }
+  }, [searchQuery, filterTags, filterPriority, showArchived, sortBy, sortOrder, currentPage]);
+
+  const fetchTags = useCallback(async () => {
+    try {
+      const response = await fetch("http://localhost:3050/api/notes/tags");
+      if (response.ok) {
+        const tags = await response.json();
+        setAvailableTags(tags);
+      }
+    } catch (error) {
+      console.error("Error fetching tags", error);
+    }
   }, []);
 
-  /**
-   * Stores the `notes` state in the local storage whenever it changes. 
-   * (ensures it doesn't get lost on refresh??)
-   */
   useEffect(() => {
-    localStorage.setItem("notes", JSON.stringify(notes));
-  }, [notes]);
+    fetchNotes();
+    fetchTags();
+  }, [fetchNotes, fetchTags]);
+
+  // WebSocket for real-time updates
+  const handleWebSocketMessage = useCallback((data) => {
+    if (data.type === "note_update") {
+      fetchNotes();
+      fetchTags();
+    }
+  }, [fetchNotes, fetchTags]);
+
+  useWebSocket("ws://localhost:3051", handleWebSocketMessage);
+
+  // Command Palette keyboard shortcut
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setShowCommandPalette(true);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  // Handle command palette commands
+  const handleCommand = useCallback((command) => {
+    setShowCommandPalette(false);
+    switch (command) {
+      case "create-note":
+        setShowEnhancedForm(true);
+        setSelectedNoteId(null);
+        break;
+      case "search":
+        setTimeout(() => searchInputRef.current?.focus(), 0);
+        break;
+      case "dashboard":
+        setShowDashboard(true);
+        setShowTrash(false);
+        setShowExportImport(false);
+        setShowDeadlines(false);
+        break;
+      case "trash":
+        setShowTrash(true);
+        setShowDashboard(false);
+        setShowExportImport(false);
+        setShowDeadlines(false);
+        break;
+      case "export":
+        setShowExportImport(true);
+        break;
+      case "import":
+        setShowExportImport(true);
+        break;
+      case "dark-mode":
+        toggleTheme();
+        break;
+      case "focus-mode":
+        setShowFocusMode(true);
+        break;
+      case "deadlines":
+        setShowDeadlines(true);
+        setShowDashboard(false);
+        setShowTrash(false);
+        setShowExportImport(false);
+        break;
+      default:
+        break;
+    }
+  }, [toggleTheme]);
+
+  const openEnhancedFormForNote = useCallback((noteId) => {
+    setSelectedNoteId(noteId);
+    setShowEnhancedForm(true);
+  }, []);
+
+  const fetchNewsForNote = useCallback(async (id) => {
+    try {
+      await fetch(`${API_BASE}/api/notes/${id}/fetch-news`, { method: "POST" });
+      await fetchNotes();
+    } catch (e) {
+      console.error("Error fetching news", e);
+    }
+  }, [fetchNotes]);
+
+  const fetchTweetsForNote = useCallback(async (id) => {
+    try {
+      await fetch(`${API_BASE}/api/notes/${id}/fetch-tweets`, { method: "POST" });
+      await fetchNotes();
+    } catch (e) {
+      console.error("Error fetching tweets", e);
+    }
+  }, [fetchNotes]);
+
+  const updateFinancialForNote = useCallback(async (id) => {
+    try {
+      await fetch(`${API_BASE}/api/notes/${id}/update-financial`, { method: "POST", headers: { "Content-Type": "application/json" } });
+      await fetchNotes();
+    } catch (e) {
+      console.error("Error updating financial", e);
+    }
+  }, [fetchNotes]);
+
+  const updateAllForNote = useCallback(async (id) => {
+    try {
+      await fetch(`${API_BASE}/api/notes/${id}/update-all`, { method: "POST" });
+      await fetchNotes();
+    } catch (e) {
+      console.error("Error updating all", e);
+    }
+  }, [fetchNotes]);
+
+  // Refetch notes when filters change
+  useEffect(() => {
+    fetchNotes();
+  }, [fetchNotes]);
 
   /**
    * Adds a new note to the `notes` state and the API.
    * Makes use of the post from the server.jsx file in the connection & database. 
    * @param {Object} newNote - The new note to be added.
    */
-  async function addNote(newNote) {
-    setNotes((prevNotes) => [...prevNotes, newNote]);
+  const addNote = useCallback(async (newNote) => {
     try {
       const response = await fetch("http://localhost:3050/api/notes/AddNote", {
         method: "POST",
@@ -60,13 +232,137 @@ function App() {
       });
 
       if (response.ok) {
-        const addedNote = await response.json();
-        setNotes((prevNotes) => [...prevNotes, addedNote]);
+        fetchNotes();
+        fetchTags();
       } else {
         console.error("Failed to add note");
       }
     } catch (error) {
       console.error("Error adding note", error);
+    }
+  }, [fetchNotes, fetchTags]);
+
+  /**
+   * Updates an existing note.
+   * @param {string} id - The id of the note to be updated.
+   * @param {Object} updateData - The data to update.
+   */
+  const updateNote = useCallback(async (id, updateData) => {
+    try {
+      const response = await fetch(`http://localhost:3050/api/notes/UpdateNote/${id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(updateData),
+      });
+
+      if (response.ok) {
+        fetchNotes();
+        fetchTags();
+      } else {
+        console.error("Failed to update note");
+      }
+    } catch (error) {
+      console.error("Error updating note", error);
+    }
+  }, [fetchNotes, fetchTags]);
+
+  // Handle template selection
+  const handleTemplateSelect = useCallback((templateData) => {
+    addNote(templateData);
+  }, [addNote]);
+
+  // Handle import
+  const handleImport = useCallback(async (importedNotes) => {
+    try {
+      const response = await fetch("http://localhost:3050/api/notes/import", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ notes: importedNotes }),
+      });
+
+      if (response.ok) {
+        fetchNotes();
+        fetchTags();
+      }
+    } catch (error) {
+      console.error("Error importing notes", error);
+    }
+  }, [fetchNotes, fetchTags]);
+
+  // Pagination
+  const paginatedNotes = useMemo(() => {
+    const startIndex = (currentPage - 1) * notesPerPage;
+    return notes.slice(startIndex, startIndex + notesPerPage);
+  }, [notes, currentPage, notesPerPage]);
+
+  const totalPages = Math.ceil(notes.length / notesPerPage);
+
+  // Note: Removed localStorage sync as we're using server-side storage
+
+  /**
+   * Pins or unpins a note.
+   */
+  async function pinNote(id, isPinned) {
+    try {
+      const response = await fetch(`http://localhost:3050/api/notes/${id}/pin`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ isPinned }),
+      });
+
+      if (response.ok) {
+        fetchNotes();
+      }
+    } catch (error) {
+      console.error("Error pinning note", error);
+    }
+  }
+
+  /**
+   * Archives or unarchives a note.
+   */
+  async function archiveNote(id, isArchived) {
+    try {
+      const response = await fetch(`http://localhost:3050/api/notes/${id}/archive`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ isArchived }),
+      });
+
+      if (response.ok) {
+        fetchNotes();
+      }
+    } catch (error) {
+      console.error("Error archiving note", error);
+    }
+  }
+
+  /**
+   * Moves a note to trash.
+   */
+  async function trashNote(id, isDeleted) {
+    try {
+      const response = await fetch(`http://localhost:3050/api/notes/${id}/trash`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ isDeleted }),
+      });
+
+      if (response.ok) {
+        fetchNotes();
+      }
+    } catch (error) {
+      console.error("Error trashing note", error);
     }
   }
 
@@ -93,19 +389,504 @@ function App() {
     }
   }
 
+  // Handle enhanced form save
+  const handleEnhancedFormSave = useCallback(async (formData) => {
+    if (selectedNoteId) {
+      await updateNote(selectedNoteId, formData);
+      setSelectedNoteId(null);
+    } else {
+      await addNote(formData);
+    }
+    setShowEnhancedForm(false);
+  }, [selectedNoteId, updateNote, addNote]);
+
+  // Handle voice transcript
+  const handleVoiceTranscript = useCallback((transcript) => {
+    addNote({
+      title: "Voice Note",
+      content: transcript,
+      tags: ["voice"]
+    });
+    setShowVoiceRecorder(false);
+  }, [addNote]);
+
+  // Handle drawing save
+  const handleDrawingSave = useCallback((dataURL) => {
+    addNote({
+      title: "Drawing",
+      content: "See attached drawing",
+      attachments: [{ type: "image", url: dataURL }],
+      tags: ["drawing"]
+    });
+    setShowDrawing(false);
+  }, [addNote]);
+
   return (
-    <div>
+    <div style={{ background: theme === "dark" ? "#1a1a1a" : "#eee", minHeight: "100vh", paddingBottom: "60px" }}>
       <Header />
-      <CreateArea onAdd={addNote} />
-      {notes.map((noteItem) => (
-        <Note
-          key={noteItem._id}
-          id={noteItem._id}
-          title={noteItem.title}
-          content={noteItem.content}
-          onDelete={() => deleteNote(noteItem._id)}
+      <ThemeToggle />
+      
+      <CommandPalette
+        isOpen={showCommandPalette}
+        onClose={() => setShowCommandPalette(false)}
+        onCommand={handleCommand}
+      />
+      
+      {showFocusMode && (
+        <FocusMode onExit={() => setShowFocusMode(false)}>
+          <div style={{ maxWidth: "800px", margin: "0 auto" }}>
+            <CreateArea onAdd={addNote} />
+            {notes.slice(0, 5).map((noteItem) => (
+              <Note
+                key={noteItem._id}
+                id={noteItem._id}
+                title={noteItem.title}
+                content={noteItem.content}
+                tags={noteItem.tags || []}
+                priority={noteItem.priority}
+                isPinned={noteItem.isPinned}
+                isArchived={noteItem.isArchived}
+                deadline={noteItem.deadline}
+                news={noteItem.news}
+                financial={noteItem.financial}
+                social={noteItem.social}
+                attachments={noteItem.attachments}
+                drawings={noteItem.drawings}
+                onDelete={() => deleteNote(noteItem._id)}
+                onUpdate={updateNote}
+                onPin={pinNote}
+                onArchive={archiveNote}
+                onTrash={trashNote}
+                onOpenEnhancedEdit={() => openEnhancedFormForNote(noteItem._id)}
+                onFetchNews={fetchNewsForNote}
+                onFetchTweets={fetchTweetsForNote}
+                onUpdateFinancial={updateFinancialForNote}
+                onUpdateAll={updateAllForNote}
+                onIntegrationComplete={fetchNotes}
+              />
+            ))}
+          </div>
+        </FocusMode>
+      )}
+      
+      {showEnhancedForm && (
+        <EnhancedNoteForm
+          note={selectedNoteId ? notes.find(n => n._id === selectedNoteId) : null}
+          onSave={handleEnhancedFormSave}
+          onCancel={() => {
+            setShowEnhancedForm(false);
+            setSelectedNoteId(null);
+          }}
         />
-      ))}
+      )}
+      
+      {showVoiceRecorder && (
+        <div style={{ width: "600px", margin: "20px auto" }}>
+          <VoiceRecorder onTranscript={handleVoiceTranscript} />
+        </div>
+      )}
+      
+      {showDrawing && (
+        <div style={{ width: "900px", margin: "20px auto" }}>
+          <DrawingCanvas onSave={handleDrawingSave} />
+        </div>
+      )}
+      
+      {showSplitView && !showEnhancedForm && !showVoiceRecorder && !showDrawing && (
+        <div style={{ width: "95%", margin: "20px auto" }}>
+          <div style={{ marginBottom: "10px", display: "flex", justifyContent: "space-between" }}>
+            <h2 style={{ color: "var(--text-primary)" }}>Split View</h2>
+            <button
+              onClick={() => setShowSplitView(false)}
+              style={{
+                padding: "8px 16px",
+                background: "#999",
+                color: "white",
+                border: "none",
+                borderRadius: "4px",
+                cursor: "pointer"
+              }}
+            >
+              Exit Split View
+            </button>
+          </div>
+          <SplitView
+            notes={notes}
+            selectedNoteId={selectedNoteId}
+            onNoteSelect={setSelectedNoteId}
+            onUpdate={updateNote}
+            onDelete={deleteNote}
+            onPin={pinNote}
+            onArchive={archiveNote}
+            onTrash={trashNote}
+            onOpenEnhancedEdit={openEnhancedFormForNote}
+            onFetchNews={fetchNewsForNote}
+            onFetchTweets={fetchTweetsForNote}
+            onUpdateFinancial={updateFinancialForNote}
+            onUpdateAll={updateAllForNote}
+            onIntegrationComplete={fetchNotes}
+          />
+        </div>
+      )}
+      
+      {/* Navigation Tabs */}
+      {!showSplitView && !showEnhancedForm && !showVoiceRecorder && !showDrawing && !showFocusMode && (
+        <div className="navigation-buttons" style={{
+          width: "95%",
+          maxWidth: "1200px",
+          margin: "20px auto",
+          display: "flex",
+          gap: "10px",
+          justifyContent: "center",
+          flexWrap: "wrap"
+        }}>
+          <button
+            onClick={() => { setShowTrash(false); setShowExportImport(false); setShowDashboard(false); setShowDeadlines(false); }}
+            style={{
+              padding: "8px 16px",
+              background: !showTrash && !showExportImport && !showDashboard && !showDeadlines ? "#f5ba13" : "#999",
+              color: "white",
+              border: "none",
+              borderRadius: "4px",
+              cursor: "pointer"
+            }}
+          >
+            Notes
+          </button>
+          <button
+            onClick={() => { setShowTrash(false); setShowExportImport(false); setShowDashboard(true); setShowDeadlines(false); }}
+            style={{
+              padding: "8px 16px",
+              background: showDashboard ? "#f5ba13" : "#999",
+              color: "white",
+              border: "none",
+              borderRadius: "4px",
+              cursor: "pointer"
+            }}
+          >
+            Dashboard
+          </button>
+          <button
+            onClick={() => { setShowDeadlines(true); setShowTrash(false); setShowExportImport(false); setShowDashboard(false); }}
+            style={{
+              padding: "8px 16px",
+              background: showDeadlines ? "#f5ba13" : "#999",
+              color: "white",
+              border: "none",
+              borderRadius: "4px",
+              cursor: "pointer"
+            }}
+          >
+            <span role="img" aria-label="Deadlines">📅</span> Deadlines
+          </button>
+          <button
+            onClick={() => { setShowTrash(true); setShowExportImport(false); setShowDashboard(false); setShowDeadlines(false); }}
+            style={{
+              padding: "8px 16px",
+              background: showTrash ? "#f5ba13" : "#999",
+              color: "white",
+              border: "none",
+              borderRadius: "4px",
+              cursor: "pointer"
+            }}
+          >
+            Trash
+          </button>
+          <button
+            onClick={() => { setShowTrash(false); setShowExportImport(!showExportImport); setShowDashboard(false); }}
+            style={{
+              padding: "8px 16px",
+              background: showExportImport ? "#f5ba13" : "#999",
+              color: "white",
+              border: "none",
+              borderRadius: "4px",
+              cursor: "pointer"
+            }}
+          >
+            Export/Import
+          </button>
+          <button
+            onClick={() => { setShowSplitView(true); }}
+            style={{
+              padding: "8px 16px",
+              background: "#2196F3",
+              color: "white",
+              border: "none",
+              borderRadius: "4px",
+              cursor: "pointer"
+            }}
+          >
+            Split View
+          </button>
+          <button
+            onClick={() => { setShowVoiceRecorder(true); setShowDrawing(false); }}
+            style={{
+              padding: "8px 16px",
+              background: "#9C27B0",
+              color: "white",
+              border: "none",
+              borderRadius: "4px",
+              cursor: "pointer"
+            }}
+          >
+            <span role="img" aria-label="Voice recorder">🎤</span> Voice
+          </button>
+          <button
+            onClick={() => { setShowDrawing(true); setShowVoiceRecorder(false); }}
+            style={{
+              padding: "8px 16px",
+              background: "#FF9800",
+              color: "white",
+              border: "none",
+              borderRadius: "4px",
+              cursor: "pointer"
+            }}
+          >
+            <span role="img" aria-label="Drawing tool">✏️</span> Draw
+          </button>
+          <button
+            onClick={() => { setShowEnhancedForm(true); setSelectedNoteId(null); }}
+            style={{
+              padding: "8px 16px",
+              background: "#4CAF50",
+              color: "white",
+              border: "none",
+              borderRadius: "4px",
+              cursor: "pointer"
+            }}
+          >
+            + Enhanced
+          </button>
+        </div>
+      )}
+
+      {showDashboard ? (
+        <IntegrationDashboard />
+      ) : showTrash ? (
+        <TrashView onRestore={fetchNotes} onDeletePermanent={fetchNotes} />
+      ) : showExportImport ? (
+        <ExportImport notes={notes} onImport={handleImport} />
+      ) : showDeadlines ? (
+        <DeadlinesView onRefresh={fetchNotes} />
+      ) : !showSplitView && !showEnhancedForm && !showVoiceRecorder && !showDrawing ? (
+        <>
+          {/* Search and Filter Bar */}
+          <div className="search-filter-container" style={{
+            width: "480px",
+            margin: "20px auto",
+            padding: "15px",
+            background: "var(--bg-secondary)",
+            borderRadius: "7px",
+            boxShadow: "0 1px 5px var(--shadow)"
+          }}>
+        <input
+          ref={searchInputRef}
+          type="text"
+          placeholder="Search notes..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          style={{
+            width: "100%",
+            padding: "8px",
+            fontSize: "14px",
+            border: "1px solid #ddd",
+            borderRadius: "4px",
+            marginBottom: "10px"
+          }}
+        />
+        
+        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginBottom: "10px" }}>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            style={{ padding: "6px", fontSize: "12px", border: "1px solid #ddd", borderRadius: "4px" }}
+          >
+            <option value="updatedAt">Sort by: Updated</option>
+            <option value="createdAt">Sort by: Created</option>
+            <option value="title">Sort by: Title</option>
+            <option value="priority">Sort by: Priority</option>
+          </select>
+          
+          <button
+            onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
+            style={{
+              padding: "6px 12px",
+              fontSize: "12px",
+              border: "1px solid #ddd",
+              borderRadius: "4px",
+              background: "#f5ba13",
+              color: "white",
+              cursor: "pointer"
+            }}
+          >
+            {sortOrder === "asc" ? "↑" : "↓"}
+          </button>
+          
+          <select
+            value={filterPriority}
+            onChange={(e) => setFilterPriority(e.target.value)}
+            style={{ padding: "6px", fontSize: "12px", border: "1px solid #ddd", borderRadius: "4px" }}
+          >
+            <option value="">All Priorities</option>
+            <option value="urgent">Urgent</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+          </select>
+          
+          <button
+            onClick={() => setShowArchived(!showArchived)}
+            style={{
+              padding: "6px 12px",
+              fontSize: "12px",
+              border: "1px solid #ddd",
+              borderRadius: "4px",
+              background: showArchived ? "#ff9800" : "#fff",
+              color: showArchived ? "white" : "black",
+              cursor: "pointer"
+            }}
+          >
+            {showArchived ? "📦 Archived" : "📁 Archive"}
+          </button>
+        </div>
+        
+        {/* Tag Filters */}
+        {availableTags.length > 0 && (
+          <div style={{ marginTop: "10px" }}>
+            <div style={{ fontSize: "12px", marginBottom: "5px" }}>Filter by tags:</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "5px" }}>
+              {availableTags.map((tag) => (
+                <button
+                  key={tag}
+                  onClick={() => {
+                    if (filterTags.includes(tag)) {
+                      setFilterTags(filterTags.filter(t => t !== tag));
+                    } else {
+                      setFilterTags([...filterTags, tag]);
+                    }
+                  }}
+                  style={{
+                    padding: "4px 8px",
+                    fontSize: "11px",
+                    border: "1px solid #ddd",
+                    borderRadius: "12px",
+                    background: filterTags.includes(tag) ? "#f5ba13" : "#fff",
+                    color: filterTags.includes(tag) ? "white" : "black",
+                    cursor: "pointer"
+                  }}
+                >
+                  {tag}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+      
+            <div style={{ position: "relative", width: "480px", margin: "20px auto" }}>
+              <TemplateSelector onSelectTemplate={handleTemplateSelect} />
+            </div>
+            
+            <CreateArea onAdd={addNote} />
+            
+            {/* Pagination Info */}
+            {notes.length > notesPerPage && (
+              <div style={{
+                width: "480px",
+                margin: "10px auto",
+                textAlign: "center",
+                color: "var(--text-secondary)",
+                fontSize: "14px"
+              }}>
+                Showing {((currentPage - 1) * notesPerPage) + 1} - {Math.min(currentPage * notesPerPage, notes.length)} of {notes.length} notes
+              </div>
+            )}
+
+            {paginatedNotes.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "20px", color: "var(--text-secondary)" }}>
+                {showArchived ? "No archived notes" : searchQuery ? "No notes found" : "No notes yet. Create one!"}
+              </div>
+            ) : (
+              <>
+                {paginatedNotes.map((noteItem) => (
+                  <Note
+                    key={noteItem._id}
+                    id={noteItem._id}
+                    title={noteItem.title}
+                    content={noteItem.content}
+                    tags={noteItem.tags || []}
+                    priority={noteItem.priority}
+                    isPinned={noteItem.isPinned}
+                    isArchived={noteItem.isArchived}
+                    deadline={noteItem.deadline}
+                    news={noteItem.news}
+                    financial={noteItem.financial}
+                    social={noteItem.social}
+                    attachments={noteItem.attachments}
+                    drawings={noteItem.drawings}
+                    onDelete={() => deleteNote(noteItem._id)}
+                    onUpdate={updateNote}
+                    onPin={pinNote}
+                    onArchive={archiveNote}
+                    onTrash={trashNote}
+                    onOpenEnhancedEdit={() => openEnhancedFormForNote(noteItem._id)}
+                    onFetchNews={fetchNewsForNote}
+                    onFetchTweets={fetchTweetsForNote}
+                    onUpdateFinancial={updateFinancialForNote}
+                    onUpdateAll={updateAllForNote}
+                    onIntegrationComplete={fetchNotes}
+                  />
+                ))}
+                
+                {/* Pagination Controls */}
+                {totalPages > 1 && (
+                  <div className="pagination-controls" style={{
+                    width: "480px",
+                    margin: "20px auto",
+                    display: "flex",
+                    justifyContent: "center",
+                    gap: "10px"
+                  }}>
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                      disabled={currentPage === 1}
+                      style={{
+                        padding: "8px 16px",
+                        background: currentPage === 1 ? "#ccc" : "#f5ba13",
+                        color: "white",
+                        border: "none",
+                        borderRadius: "4px",
+                        cursor: currentPage === 1 ? "not-allowed" : "pointer"
+                      }}
+                    >
+                      Previous
+                    </button>
+                    <span style={{
+                      padding: "8px 16px",
+                      color: "var(--text-primary)"
+                    }}>
+                      Page {currentPage} of {totalPages}
+                    </span>
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                      disabled={currentPage === totalPages}
+                      style={{
+                        padding: "8px 16px",
+                        background: currentPage === totalPages ? "#ccc" : "#f5ba13",
+                        color: "white",
+                        border: "none",
+                        borderRadius: "4px",
+                        cursor: currentPage === totalPages ? "not-allowed" : "pointer"
+                      }}
+                    >
+                      Next
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </>
+        ) : null}
       <Footer />
     </div>
   );
