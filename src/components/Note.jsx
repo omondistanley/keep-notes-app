@@ -175,31 +175,70 @@ function Note(props) {
         </div>
       )}
 
-      {/* News: only when articles are available — sentiment + compact headlines */}
-      {hasNewsData && (
+      {/* News: summary + sentiment + compact headlines; Open opens modal */}
+      {(props.news?.enabled && props.news?.keywords?.length) || hasNewsData ? (
         <div style={sectionStyle}>
-          <strong><span role="img" aria-label="News">📰</span> News</strong>
-          {newsSentiment && sentimentBadge(newsSentiment)}
-          <span style={{ marginLeft: "6px", fontSize: "11px", color: "var(--text-secondary, #666)" }}>
-            {articles.length} article{articles.length !== 1 ? "s" : ""}
-          </span>
-          <div style={{ marginTop: "6px", fontSize: "12px" }}>
-            {articles.slice(0, 2).map((a, i) => (
-              <div key={i} style={{ marginBottom: "4px" }}>
-                {a.title ? (a.title.length > 80 ? a.title.substring(0, 80) + "…" : a.title) : (a.snippet || "").substring(0, 80) + "…"}
-              </div>
-            ))}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}>
+            <span>
+              <strong><span role="img" aria-label="News">📰</span> News</strong>
+              {newsSentiment && sentimentBadge(newsSentiment)}
+              <span style={{ marginLeft: "6px", fontSize: "11px", color: "var(--text-secondary, #666)" }}>
+                {articles.length > 0 ? `${articles.length} article${articles.length !== 1 ? "s" : ""}` : "No articles yet"}
+              </span>
+            </span>
+            {props.onOpenNewsModal && (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); props.onOpenNewsModal(); }}
+                style={{ padding: "4px 10px", fontSize: "11px", cursor: "pointer", background: "#1976d2", color: "#fff", border: "none", borderRadius: "4px" }}
+              >
+                Open
+              </button>
+            )}
           </div>
-        </div>
-      )}
-
-      {/* Financial: only when data is available — tracking chart + compact table */}
-      {hasFinancialData && (
-        <div style={sectionStyle}>
-          <strong><span role="img" aria-label="Financial">📈</span> Financial</strong>
-          {props.financial?.type && (
-            <span style={{ marginLeft: "6px", fontSize: "11px" }}>({props.financial.type})</span>
+          {/* Brief summary from note content + keywords */}
+          <div style={{ marginTop: "6px", fontSize: "12px", fontStyle: "italic", color: "var(--text-secondary, #555)" }}>
+            {(() => {
+              const title = (props.title || "").trim();
+              const contentSnippet = (props.content || "").trim().slice(0, 100);
+              const kw = (props.news?.keywords || []).slice(0, 5).join(", ");
+              const parts = [title, contentSnippet, kw ? `Keywords: ${kw}` : ""].filter(Boolean);
+              const summary = parts.join(" · ");
+              return (summary.length > 200 ? summary.slice(0, 200) + "…" : summary) || "No summary.";
+            })()}
+          </div>
+          {articles.length > 0 && (
+            <div style={{ marginTop: "6px", fontSize: "12px" }}>
+              {articles.slice(0, 2).map((a, i) => (
+                <div key={i} style={{ marginBottom: "4px" }}>
+                  {a.title ? (a.title.length > 80 ? a.title.substring(0, 80) + "…" : a.title) : (a.snippet || "").substring(0, 80) + "…"}
+                </div>
+              ))}
+            </div>
           )}
+        </div>
+      ) : null}
+
+      {/* Financial: chart + compact table; Open opens modal with all symbols and top gainers/movers */}
+      {(props.financial?.enabled && (props.financial?.symbols?.length || prices.length > 0)) || hasFinancialData ? (
+        <div style={sectionStyle}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}>
+            <span>
+              <strong><span role="img" aria-label="Financial">📈</span> Financial</strong>
+              {props.financial?.type && (
+                <span style={{ marginLeft: "6px", fontSize: "11px" }}>({props.financial.type})</span>
+              )}
+            </span>
+            {props.onOpenFinancialModal && (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); props.onOpenFinancialModal(); }}
+                style={{ padding: "4px 10px", fontSize: "11px", cursor: "pointer", background: "#1976d2", color: "#fff", border: "none", borderRadius: "4px" }}
+              >
+                Open
+              </button>
+            )}
+          </div>
           {prices.length > 0 && (
             <>
               <div style={{ height: "120px", width: "100%", marginTop: "8px" }}>
@@ -237,7 +276,7 @@ function Note(props) {
             <div style={{ marginTop: "6px" }}>{props.financial.summary}</div>
           )}
         </div>
-      )}
+      ) : null}
 
       {/* Social / X: only when tweets are available — sentiment summary + 1–2 snippets */}
       {hasSocialData && (
@@ -273,7 +312,13 @@ function Note(props) {
       style={{
         position: "relative",
         borderLeft: props.isPinned ? "4px solid #f5ba13" : "none",
-        cursor: showCompact ? "pointer" : undefined
+        cursor: showCompact ? "pointer" : undefined,
+        ...(isModal && {
+          width: "100%",
+          maxWidth: "100%",
+          float: "none",
+          margin: 0
+        })
       }}
       onClick={showCompact ? (e) => { if (!e.target.closest(".note-actions") && !e.target.closest("button")) onOpenModal(); } : undefined}
       role={showCompact ? "button" : undefined}
@@ -336,7 +381,7 @@ function Note(props) {
 
       {showCompact && (
         <div style={{ marginTop: "8px", fontSize: "11px", color: "var(--text-secondary, #666)" }}>
-          Click to open
+          Click card or use Open to view in modal
         </div>
       )}
 
@@ -421,6 +466,11 @@ function Note(props) {
       )}
 
       <div className="note-actions" style={{ marginTop: "10px", display: "flex", gap: "5px", flexWrap: "wrap" }}>
+        {onOpenModal && !isModal && (
+          <button type="button" onClick={(e) => { e.stopPropagation(); onOpenModal(); }} style={{ ...buttonStyle, color: "#1976d2", fontWeight: "bold" }}>
+            Open
+          </button>
+        )}
         {props.onOpenEnhancedEdit && (
           <button type="button" onClick={props.onOpenEnhancedEdit} style={{ ...buttonStyle, color: "#2196F3" }}>
             Edit

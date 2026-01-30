@@ -11,6 +11,8 @@ const SplitView = ({
   onArchive,
   onTrash,
   onOpenEnhancedEdit,
+  onOpenNewsModal,
+  onOpenFinancialModal,
   onFetchNews,
   onFetchTweets,
   onUpdateFinancial,
@@ -132,6 +134,8 @@ const SplitView = ({
             onArchive={onArchive}
             onTrash={onTrash}
             onOpenEnhancedEdit={onOpenEnhancedEdit ? () => onOpenEnhancedEdit(selectedNote._id) : undefined}
+            onOpenNewsModal={onOpenNewsModal ? () => onOpenNewsModal(selectedNote._id) : undefined}
+            onOpenFinancialModal={onOpenFinancialModal ? () => onOpenFinancialModal(selectedNote._id) : undefined}
             onFetchNews={onFetchNews}
             onFetchTweets={onFetchTweets}
             onUpdateFinancial={onUpdateFinancial}

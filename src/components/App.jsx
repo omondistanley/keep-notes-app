@@ -46,6 +46,8 @@ function App() {
   const [showEnhancedForm, setShowEnhancedForm] = useState(false);
   const [selectedNoteId, setSelectedNoteId] = useState(null);
   const [openNoteModalId, setOpenNoteModalId] = useState(null);
+  const [openNewsModalNoteId, setOpenNewsModalNoteId] = useState(null);
+  const [openFinancialModalNoteId, setOpenFinancialModalNoteId] = useState(null);
   const [availableTags, setAvailableTags] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [notesPerPage] = useState(20);
@@ -445,6 +447,8 @@ function App() {
                 attachments={noteItem.attachments}
                 drawings={noteItem.drawings}
                 onOpenModal={() => setOpenNoteModalId(noteItem._id)}
+                onOpenNewsModal={() => setOpenNewsModalNoteId(noteItem._id)}
+                onOpenFinancialModal={() => setOpenFinancialModalNoteId(noteItem._id)}
                 onDelete={() => deleteNote(noteItem._id)}
                 onUpdate={updateNote}
                 onPin={pinNote}
@@ -500,11 +504,12 @@ function App() {
                 background: "var(--bg-secondary, #fff)",
                 borderRadius: "8px",
                 boxShadow: "0 4px 20px rgba(0,0,0,0.2)",
-                maxWidth: "560px",
+                maxWidth: "min(720px, 92vw)",
                 width: "100%",
                 maxHeight: "90vh",
                 overflow: "auto",
-                position: "relative"
+                position: "relative",
+                padding: "16px"
               }}
             >
               <Note
@@ -524,6 +529,8 @@ function App() {
                 drawings={modalNote.drawings}
                 isModal
                 onCloseModal={() => setOpenNoteModalId(null)}
+                onOpenNewsModal={() => setOpenNewsModalNoteId(modalNote._id)}
+                onOpenFinancialModal={() => setOpenFinancialModalNoteId(modalNote._id)}
                 onDelete={() => { deleteNote(modalNote._id); setOpenNoteModalId(null); }}
                 onUpdate={updateNote}
                 onPin={pinNote}
@@ -536,6 +543,188 @@ function App() {
                 onUpdateAll={updateAllForNote}
                 onIntegrationComplete={() => { fetchNotes(); }}
               />
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* News modal: full articles + summary for selected note */}
+      {openNewsModalNoteId && (() => {
+        const note = notes.find(n => n._id === openNewsModalNoteId);
+        if (!note) return null;
+        const articles = (note.news?.articles && Array.isArray(note.news.articles)) ? note.news.articles : [];
+        const keywords = note.news?.keywords || [];
+        const summaryParts = [
+          note.title?.trim(),
+          (note.content || "").trim().slice(0, 200),
+          keywords.length ? `Topics: ${keywords.slice(0, 8).join(", ")}` : ""
+        ].filter(Boolean);
+        const summary = summaryParts.join(" · ") + (summaryParts.join("").length > 250 ? "…" : "");
+        return (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="News"
+            onClick={() => setOpenNewsModalNoteId(null)}
+            style={{
+              position: "fixed",
+              inset: 0,
+              background: "rgba(0,0,0,0.5)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              zIndex: 1001,
+              padding: "20px"
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                background: "var(--bg-secondary, #fff)",
+                borderRadius: "8px",
+                boxShadow: "0 4px 20px rgba(0,0,0,0.2)",
+                maxWidth: "640px",
+                width: "100%",
+                maxHeight: "90vh",
+                overflow: "auto",
+                position: "relative"
+              }}
+            >
+              <div style={{ padding: "16px", borderBottom: "1px solid #eee", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <h2 style={{ margin: 0, color: "var(--text-primary)" }}><span role="img" aria-label="News">📰</span> News</h2>
+                <button type="button" onClick={() => setOpenNewsModalNoteId(null)} style={{ padding: "6px 12px", background: "#666", color: "#fff", border: "none", borderRadius: "4px", cursor: "pointer" }}>Close</button>
+              </div>
+              <div style={{ padding: "16px" }}>
+                <p style={{ fontSize: "13px", color: "var(--text-secondary, #555)", marginBottom: "16px", fontStyle: "italic" }}>{summary || "No summary."}</p>
+                {articles.length === 0 ? (
+                  <p style={{ color: "var(--text-secondary, #666)" }}>No articles yet. Use &quot;Fetch news&quot; on the note.</p>
+                ) : (
+                  <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+                    {articles.map((a, i) => (
+                      <li key={i} style={{ marginBottom: "12px", paddingBottom: "12px", borderBottom: "1px solid #eee" }}>
+                        <a href={a.url || a.link || "#"} target="_blank" rel="noopener noreferrer" style={{ color: "#1976d2", fontWeight: "bold" }}>{a.title || a.snippet || "Untitled"}</a>
+                        {a.snippet && a.title && <p style={{ margin: "4px 0 0", fontSize: "12px", color: "var(--text-secondary)" }}>{a.snippet}</p>}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Financial modal: all symbols, top gainers, largest movers */}
+      {openFinancialModalNoteId && (() => {
+        const note = notes.find(n => n._id === openFinancialModalNoteId);
+        if (!note) return null;
+        const prices = (note.financial?.data?.prices && Array.isArray(note.financial.data.prices)) ? note.financial.data.prices : [];
+        const type = note.financial?.type || "crypto";
+        const sortedByGain = [...prices].sort((a, b) => (Number(b.changePercent) ?? 0) - (Number(a.changePercent) ?? 0));
+        const sortedByMove = [...prices].sort((a, b) => Math.abs(Number(b.changePercent) ?? 0) - Math.abs(Number(a.changePercent) ?? 0));
+        const topGainers = sortedByGain.slice(0, 5);
+        const topLosers = sortedByGain.slice(-5).reverse();
+        const largestMovers = sortedByMove.slice(0, 5);
+        return (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Financial"
+            onClick={() => setOpenFinancialModalNoteId(null)}
+            style={{
+              position: "fixed",
+              inset: 0,
+              background: "rgba(0,0,0,0.5)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              zIndex: 1001,
+              padding: "20px"
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                background: "var(--bg-secondary, #fff)",
+                borderRadius: "8px",
+                boxShadow: "0 4px 20px rgba(0,0,0,0.2)",
+                maxWidth: "560px",
+                width: "100%",
+                maxHeight: "90vh",
+                overflow: "auto",
+                position: "relative"
+              }}
+            >
+              <div style={{ padding: "16px", borderBottom: "1px solid #eee", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <h2 style={{ margin: 0, color: "var(--text-primary)" }}><span role="img" aria-label="Financial">📈</span> Financial ({type})</h2>
+                <button type="button" onClick={() => setOpenFinancialModalNoteId(null)} style={{ padding: "6px 12px", background: "#666", color: "#fff", border: "none", borderRadius: "4px", cursor: "pointer" }}>Close</button>
+              </div>
+              <div style={{ padding: "16px" }}>
+                {prices.length === 0 ? (
+                  <p style={{ color: "var(--text-secondary, #666)" }}>No price data yet. Use &quot;Update financial&quot; on the note.</p>
+                ) : (
+                  <>
+                    {largestMovers.length > 0 && (
+                      <section style={{ marginBottom: "16px" }}>
+                        <h3 style={{ fontSize: "14px", marginBottom: "8px", color: "var(--text-primary)" }}>Largest movers</h3>
+                        <ul style={{ listStyle: "none", padding: 0, margin: 0, fontSize: "13px" }}>
+                          {largestMovers.map((p, i) => (
+                            <li key={i} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", borderBottom: "1px solid #f0f0f0" }}>
+                              <span>{p.symbol}</span>
+                              <span>{Number(p.price ?? p.last ?? 0).toFixed(2)}</span>
+                              <span style={{ color: (p.changePercent >= 0) ? "#2e7d32" : "#c62828" }}>
+                                {p.changePercent != null ? `${p.changePercent >= 0 ? "+" : ""}${Number(p.changePercent).toFixed(1)}%` : "—"}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </section>
+                    )}
+                    {topGainers.length > 0 && (
+                      <section style={{ marginBottom: "16px" }}>
+                        <h3 style={{ fontSize: "14px", marginBottom: "8px", color: "#2e7d32" }}>Top gainers</h3>
+                        <ul style={{ listStyle: "none", padding: 0, margin: 0, fontSize: "13px" }}>
+                          {topGainers.map((p, i) => (
+                            <li key={i} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", borderBottom: "1px solid #f0f0f0" }}>
+                              <span>{p.symbol}</span>
+                              <span>{Number(p.price ?? p.last ?? 0).toFixed(2)}</span>
+                              <span style={{ color: "#2e7d32" }}>{p.changePercent != null ? `+${Number(p.changePercent).toFixed(1)}%` : "—"}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </section>
+                    )}
+                    {topLosers.length > 0 && (
+                      <section style={{ marginBottom: "16px" }}>
+                        <h3 style={{ fontSize: "14px", marginBottom: "8px", color: "#c62828" }}>Top losers</h3>
+                        <ul style={{ listStyle: "none", padding: 0, margin: 0, fontSize: "13px" }}>
+                          {topLosers.map((p, i) => (
+                            <li key={i} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", borderBottom: "1px solid #f0f0f0" }}>
+                              <span>{p.symbol}</span>
+                              <span>{Number(p.price ?? p.last ?? 0).toFixed(2)}</span>
+                              <span style={{ color: "#c62828" }}>{p.changePercent != null ? `${Number(p.changePercent).toFixed(1)}%` : "—"}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </section>
+                    )}
+                    <section>
+                      <h3 style={{ fontSize: "14px", marginBottom: "8px", color: "var(--text-primary)" }}>All symbols</h3>
+                      <ul style={{ listStyle: "none", padding: 0, margin: 0, fontSize: "13px" }}>
+                        {prices.map((p, i) => (
+                          <li key={i} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", borderBottom: "1px solid #f0f0f0" }}>
+                            <span>{p.symbol}</span>
+                            <span>{Number(p.price ?? p.last ?? 0).toFixed(2)}</span>
+                            <span style={{ color: (p.changePercent >= 0) ? "#2e7d32" : "#c62828" }}>
+                              {p.changePercent != null ? `${p.changePercent >= 0 ? "+" : ""}${Number(p.changePercent).toFixed(1)}%` : "—"}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </section>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         );
@@ -581,6 +770,8 @@ function App() {
             onArchive={archiveNote}
             onTrash={trashNote}
             onOpenEnhancedEdit={openEnhancedFormForNote}
+            onOpenNewsModal={setOpenNewsModalNoteId}
+            onOpenFinancialModal={setOpenFinancialModalNoteId}
             onFetchNews={fetchNewsForNote}
             onFetchTweets={fetchTweetsForNote}
             onUpdateFinancial={updateFinancialForNote}
@@ -886,6 +1077,8 @@ function App() {
                     attachments={noteItem.attachments}
                     drawings={noteItem.drawings}
                     onOpenModal={() => setOpenNoteModalId(noteItem._id)}
+                    onOpenNewsModal={() => setOpenNewsModalNoteId(noteItem._id)}
+                    onOpenFinancialModal={() => setOpenFinancialModalNoteId(noteItem._id)}
                     onDelete={() => deleteNote(noteItem._id)}
                     onUpdate={updateNote}
                     onPin={pinNote}
