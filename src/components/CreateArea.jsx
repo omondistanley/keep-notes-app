@@ -312,10 +312,13 @@ function CreateArea(props) {
                 <input
                   type="checkbox"
                   checked={integrations.news.enabled}
-                  onChange={(e) => setIntegrations(prev => ({
-                    ...prev,
-                    news: { ...prev.news, enabled: e.target.checked }
-                  }))}
+                  onChange={(e) => {
+                    const checked = !!(e?.target?.checked);
+                    setIntegrations(prev => ({
+                      ...prev,
+                      news: { ...prev.news, enabled: checked }
+                    }));
+                  }}
                   style={{ marginRight: "6px" }}
                 />
                 📰 News (keywords)
@@ -355,10 +358,13 @@ function CreateArea(props) {
                 <input
                   type="checkbox"
                   checked={integrations.financial.enabled}
-                  onChange={(e) => setIntegrations(prev => ({
-                    ...prev,
-                    financial: { ...prev.financial, enabled: e.target.checked }
-                  }))}
+                  onChange={(e) => {
+                    const checked = !!(e?.target?.checked);
+                    setIntegrations(prev => ({
+                      ...prev,
+                      financial: { ...prev.financial, enabled: checked }
+                    }));
+                  }}
                   style={{ marginRight: "6px" }}
                 />
                 📈 Financial
@@ -409,10 +415,13 @@ function CreateArea(props) {
                 <input
                   type="checkbox"
                   checked={integrations.social.x.enabled}
-                  onChange={(e) => setIntegrations(prev => ({
-                    ...prev,
-                    social: { ...prev.social, x: { ...prev.social.x, enabled: e.target.checked } }
-                  }))}
+                  onChange={(e) => {
+                    const checked = !!(e?.target?.checked);
+                    setIntegrations(prev => ({
+                      ...prev,
+                      social: { ...prev.social, x: { ...prev.social.x, enabled: checked } }
+                    }));
+                  }}
                   style={{ marginRight: "6px" }}
                 />
                 🐦 X / Social keywords
