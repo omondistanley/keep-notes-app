@@ -30,7 +30,7 @@ node server.js
 ```
 
 - API: **http://localhost:3050**
-- WebSocket: **ws://localhost:3051**
+- WebSocket: **ws://localhost:3050** (same host/port as API)
 
 ### 3. Start frontend
 
@@ -117,7 +117,7 @@ Test integrations (with server running): `node scripts/test-integrations.js`
 
 ## Deploying
 
-- **Frontend:** Deploy the React app to Vercel (build: `npm run build`, output: `build`). Set `REACT_APP_API_URL` and optionally `REACT_APP_WS_URL` to your backend URL.
+- **Frontend:** Deploy the React app to Vercel (build: `npm run build`, output: `build`). Set `REACT_APP_API_URL` and optionally `REACT_APP_WS_URL` (defaults to same host as API, using `ws://`/`wss://`) to your backend URL.
 - **Backend:** Deploy Express + DB to Render, Railway, Fly.io, or similar. Use `DATABASE_TYPE=postgres` and set CORS to your Vercel frontend origin.
 
 ---

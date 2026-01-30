@@ -1,13 +1,27 @@
 const { Sequelize } = require("sequelize");
 const path = require("path");
 
-// Get database type from environment variable, default to sqlite
-const DB_TYPE = process.env.DATABASE_TYPE || "sqlite";
+// Get database type from environment variable, default to sqlite unless DATABASE_URL is present.
+// Priority:
+// 1) If DATABASE_URL exists, use it (Heroku-style URL for Postgres).
+// 2) Else if DATABASE_TYPE=postgres, use discrete POSTGRES_* vars.
+// 3) Else fall back to SQLite file.
+const DB_TYPE = process.env.DATABASE_URL ? "postgres" : (process.env.DATABASE_TYPE || "sqlite");
 
 let sequelize;
 
-if (DB_TYPE === "postgres") {
-  // PostgreSQL configuration
+if (DB_TYPE === "postgres" && process.env.DATABASE_URL) {
+  // Parse and use DATABASE_URL (Heroku)
+  sequelize = new Sequelize(process.env.DATABASE_URL, {
+    dialect: "postgres",
+    protocol: "postgres",
+    logging: process.env.NODE_ENV === "development" ? console.log : false,
+    dialectOptions: {
+      ssl: process.env.PGSSLMODE === "disable" ? false : { require: true, rejectUnauthorized: false }
+    }
+  });
+} else if (DB_TYPE === "postgres") {
+  // PostgreSQL configuration via discrete vars
   sequelize = new Sequelize(
     process.env.POSTGRES_DB || "notes",
     process.env.POSTGRES_USER || "postgres",
@@ -22,6 +36,9 @@ if (DB_TYPE === "postgres") {
         min: 0,
         acquire: 30000,
         idle: 10000
+      },
+      dialectOptions: {
+        ssl: process.env.PGSSLMODE === "disable" ? false : { require: true, rejectUnauthorized: false }
       }
     }
   );

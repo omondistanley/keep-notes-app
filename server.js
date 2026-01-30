@@ -12,6 +12,7 @@ const cors = require("cors");
 const WebSocket = require("ws");
 const rateLimit = require("express-rate-limit");
 const helmet = require("helmet");
+const path = require("path");
 const { testConnection, sequelize } = require("./config/database");
 const dbService = require("./services/databaseService");
 const Note = require("./models/Note");
@@ -42,8 +43,13 @@ const limiter = rateLimit({
 });
 app.use("/api/", limiter);
 
-// Initialize database and start server
-const server = app.listen(3050, async () => {
+// Serve static frontend (build) for Heroku/single-app deploys
+const buildPath = path.join(__dirname, "build");
+app.use(Express.static(buildPath));
+
+// Initialize database and start server (Railway/Render/etc. provide PORT)
+const PORT = process.env.PORT || 3050;
+const server = app.listen(PORT, async () => {
   try {
     // Test database connection
     const connected = await testConnection();
@@ -56,11 +62,12 @@ const server = app.listen(3050, async () => {
   } catch (error) {
     console.error("Failed to initialize database", error);
   }
-  console.log("Server Started on port 3050\n");
+  console.log(`Server Started on port ${PORT}\n`);
 });
 
 // WebSocket server for real-time updates
-const wss = new WebSocket.Server({ port: 3051 });
+// Attach WS to same HTTP server so platforms with a single exposed port (e.g. Railway/Heroku) work.
+const wss = new WebSocket.Server({ server });
 
 wss.on("connection", (ws) => {
   console.log("WebSocket client connected");
@@ -1087,6 +1094,14 @@ app.post('/api/tasks/:platform/create', async (request, response) => {
     console.error("Error creating task", error);
     response.status(500).send({ message: "Internal Server Error" });
   }
+});
+
+// Catch-all to serve React app (non-API routes)
+app.get("*", (request, response) => {
+  if (request.path.startsWith("/api")) {
+    return response.status(404).json({ message: "Not found" });
+  }
+  response.sendFile(path.join(buildPath, "index.html"));
 });
 
 // ==================== CRON JOBS ====================

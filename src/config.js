@@ -13,7 +13,14 @@ const getWsUrl = () => {
   if (typeof process !== "undefined" && process.env?.REACT_APP_WS_URL) {
     return process.env.REACT_APP_WS_URL;
   }
-  return "ws://localhost:3051";
+  const apiBase = getApiBase();
+  if (apiBase.startsWith("https://")) {
+    return apiBase.replace(/^https/, "wss");
+  }
+  if (apiBase.startsWith("http://")) {
+    return apiBase.replace(/^http/, "ws");
+  }
+  return "ws://localhost:3050";
 };
 
 export const API_BASE = getApiBase();
