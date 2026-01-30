@@ -150,7 +150,9 @@ function Note(props) {
   const prices = (hasFinancialData && props.financial?.data?.prices) || [];
   const tweets = props.social?.x?.tweets;
   const redditPosts = props.social?.reddit?.posts;
+  // eslint-disable-next-line no-unused-vars
   const hasSocialData = (tweets && Array.isArray(tweets) && tweets.length > 0) || (redditPosts && Array.isArray(redditPosts) && redditPosts.length > 0);
+  void hasSocialData;
   const socialSentiment = props.social?.x?.sentiment;
   const redditSentiment = props.social?.reddit?.sentiment;
   const hasAttachments = props.attachments && props.attachments.length > 0;

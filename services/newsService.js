@@ -244,38 +244,53 @@ class NewsService {
   }
 
   /**
-   * Build a short extractive summary from top articles tied to the note's subject (keywords + title).
-   * Uses up to 25 articles; summary is 2–4 sentences from titles and snippets.
+   * Build an article-derived summary from the top 25 articles.
+   * Uses only article titles and snippets so the summary reflects what the articles actually say.
+   * Structure: short intro line, then 2–4 direct headline/snippet sentences, then optional "Themes:" line.
    */
   summarizeArticlesForNote(articles, noteContext = {}) {
     const top = (articles || []).slice(0, 25);
     if (top.length === 0) return "";
-    const keywords = noteContext.keywords || [];
-    const noteTitle = (noteContext.title || "").trim();
-    const parts = [];
-    if (noteTitle || keywords.length) {
-      const subject = noteTitle || keywords.slice(0, 5).join(", ");
-      parts.push(`Based on recent coverage related to "${subject}":`);
-    }
-    const sentences = [];
-    const seen = new Set();
+
+    const titles = [];
+    const snippets = [];
+    const seenTitles = new Set();
     for (const a of top) {
       const title = (a.title || "").trim();
-      const snippet = (a.snippet || "").trim().slice(0, 120);
-      if (title && !seen.has(title)) {
-        seen.add(title);
-        if (snippet) {
-          sentences.push(`${title} — ${snippet}${snippet.length >= 120 ? "…" : ""}`);
-        } else {
-          sentences.push(title);
-        }
-        if (sentences.length >= 5) break;
+      const snippet = (a.snippet || a.description || "").trim().replace(/\s+/g, " ").slice(0, 220);
+      if (title && !seenTitles.has(title.toLowerCase())) {
+        seenTitles.add(title.toLowerCase());
+        titles.push(title);
+        if (snippet) snippets.push(snippet);
       }
     }
-    if (sentences.length === 0) return parts.join(" ") || "No summary available.";
-    const summaryBody = sentences.slice(0, 4).join(" ");
-    const full = (parts.join(" ") + " " + summaryBody).trim();
-    return full.slice(0, 600) + (full.length > 600 ? "…" : "");
+
+    if (titles.length === 0) return "No article titles available to summarize.";
+
+    const parts = [];
+    parts.push("Based on the latest coverage:");
+    if (titles.length >= 1) {
+      const lead = titles[0];
+      parts.push(lead.length <= 110 ? (lead.endsWith(".") ? lead : lead + ".") : lead.slice(0, 107) + "…");
+    }
+    if (titles.length >= 2) {
+      const second = titles[1];
+      parts.push(second.length <= 100 ? (second.endsWith(".") ? second : second + ".") : second.slice(0, 97) + "…");
+    }
+    if (snippets.length >= 1 && parts.length <= 3) {
+      const firstSnippet = snippets[0].replace(/^["']|["']$/g, "").trim();
+      if (firstSnippet.length > 40) {
+        const use = firstSnippet.length <= 140 ? firstSnippet : firstSnippet.slice(0, 137) + "…";
+        parts.push(use.endsWith(".") ? use : use + ".");
+      }
+    }
+    if (titles.length >= 3 && parts.length <= 4) {
+      const third = titles[2];
+      parts.push(third.length <= 95 ? (third.endsWith(".") ? third : third + ".") : third.slice(0, 92) + "…");
+    }
+    const summary = parts.join(" ");
+    const capped = summary.slice(0, 680) + (summary.length > 680 ? "…" : "");
+    return capped;
   }
 
   async fetchNewsForNote(note, count = 25) {

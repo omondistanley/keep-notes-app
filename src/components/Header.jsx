@@ -28,28 +28,137 @@ function Header({
   onSelectSplitView,
   onSelectVoice,
   onSelectDraw,
-  onSelectEnhanced
+  onSelectEnhanced,
+  sidebar = false
 }) {
   const handleNavSelect = (handler) => {
     if (typeof handler === "function") handler();
     onNavToggle(false);
   };
 
+  const brandAndHamburger = (
+    <>
+      <h1 className="header-title sidebar-brand-title">yApSs</h1>
+      <button
+        type="button"
+        className="header-hamburger sidebar-hamburger"
+        onClick={() => onNavToggle(!navOpen)}
+        aria-expanded={navOpen}
+        aria-label={navOpen ? "Close menu" : "Open menu"}
+      >
+        <span className="hamburger-line" />
+        <span className="hamburger-line" />
+        <span className="hamburger-line" />
+      </button>
+    </>
+  );
+
+  if (sidebar) {
+    return (
+      <div className="sidebar-header">
+        {brandAndHamburger}
+        {navOpen && (
+          <>
+            <div
+              className="nav-backdrop"
+              onClick={() => onNavToggle(false)}
+              aria-hidden="true"
+            />
+            <nav className="nav-drawer" role="navigation" aria-label="Main navigation">
+              <ul className="nav-list">
+                <li>
+                  <button
+                    type="button"
+                    style={navItemStyle(activeView === "notes")}
+                    onClick={() => handleNavSelect(onSelectNotes)}
+                  >
+                    <span role="img" aria-label="Notes">📋</span> Notes
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    style={navItemStyle(activeView === "dashboard")}
+                    onClick={() => handleNavSelect(onSelectDashboard)}
+                  >
+                    <span role="img" aria-label="Dashboard">📊</span> Dashboard
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    style={navItemStyle(activeView === "deadlines")}
+                    onClick={() => handleNavSelect(onSelectDeadlines)}
+                  >
+                    <span role="img" aria-label="Deadlines">📅</span> Deadlines
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    style={navItemStyle(activeView === "trash")}
+                    onClick={() => handleNavSelect(onSelectTrash)}
+                  >
+                    <span role="img" aria-label="Trash">🗑️</span> Trash
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    style={navItemStyle(activeView === "exportImport")}
+                    onClick={() => handleNavSelect(onSelectExportImport)}
+                  >
+                    <span role="img" aria-label="Export Import">📤</span> Export / Import
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    style={navItemStyle(false)}
+                    onClick={() => handleNavSelect(onSelectSplitView)}
+                  >
+                    <span role="img" aria-label="Split view">⬌</span> Split View
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    style={navItemStyle(false)}
+                    onClick={() => handleNavSelect(onSelectVoice)}
+                  >
+                    <span role="img" aria-label="Voice">🎤</span> Voice
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    style={navItemStyle(false)}
+                    onClick={() => handleNavSelect(onSelectDraw)}
+                  >
+                    <span role="img" aria-label="Draw">✏️</span> Draw
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    style={navItemStyle(false)}
+                    onClick={() => handleNavSelect(onSelectEnhanced)}
+                  >
+                    <span role="img" aria-label="Enhanced">＋</span> Enhanced
+                  </button>
+                </li>
+              </ul>
+            </nav>
+          </>
+        )}
+      </div>
+    );
+  }
+
   return (
     <header className="app-header">
       <div className="header-inner">
-        <h1 className="header-title">yApSs</h1>
-        <button
-          type="button"
-          className="header-hamburger"
-          onClick={() => onNavToggle(!navOpen)}
-          aria-expanded={navOpen}
-          aria-label={navOpen ? "Close menu" : "Open menu"}
-        >
-          <span className="hamburger-line" />
-          <span className="hamburger-line" />
-          <span className="hamburger-line" />
-        </button>
+        {brandAndHamburger}
       </div>
 
       {navOpen && (
@@ -61,13 +170,13 @@ function Header({
           />
           <nav className="nav-drawer" role="navigation" aria-label="Main navigation">
             <ul className="nav-list">
-              <li>
-                <button
-                  type="button"
-                  style={navItemStyle(activeView === "notes")}
-                  onClick={() => handleNavSelect(onSelectNotes)}
+                <li>
+                  <button
+                    type="button"
+                    style={navItemStyle(activeView === "notes")}
+                    onClick={() => handleNavSelect(onSelectNotes)}
                 >
-                  📋 Notes
+                  <span role="img" aria-label="Notes">📋</span> Notes
                 </button>
               </li>
               <li>
@@ -76,7 +185,7 @@ function Header({
                   style={navItemStyle(activeView === "dashboard")}
                   onClick={() => handleNavSelect(onSelectDashboard)}
                 >
-                  📊 Dashboard
+                  <span role="img" aria-label="Dashboard">📊</span> Dashboard
                 </button>
               </li>
               <li>
@@ -85,7 +194,7 @@ function Header({
                   style={navItemStyle(activeView === "deadlines")}
                   onClick={() => handleNavSelect(onSelectDeadlines)}
                 >
-                  📅 Deadlines
+                  <span role="img" aria-label="Deadlines">📅</span> Deadlines
                 </button>
               </li>
               <li>
@@ -94,7 +203,7 @@ function Header({
                   style={navItemStyle(activeView === "trash")}
                   onClick={() => handleNavSelect(onSelectTrash)}
                 >
-                  🗑️ Trash
+                  <span role="img" aria-label="Trash">🗑️</span> Trash
                 </button>
               </li>
               <li>
@@ -103,7 +212,7 @@ function Header({
                   style={navItemStyle(activeView === "exportImport")}
                   onClick={() => handleNavSelect(onSelectExportImport)}
                 >
-                  📤 Export / Import
+                  <span role="img" aria-label="Export Import">📤</span> Export / Import
                 </button>
               </li>
               <li>
@@ -112,7 +221,7 @@ function Header({
                   style={navItemStyle(false)}
                   onClick={() => handleNavSelect(onSelectSplitView)}
                 >
-                  ⬌ Split View
+                  <span role="img" aria-label="Split view">⬌</span> Split View
                 </button>
               </li>
               <li>
@@ -121,7 +230,7 @@ function Header({
                   style={navItemStyle(false)}
                   onClick={() => handleNavSelect(onSelectVoice)}
                 >
-                  🎤 Voice
+                  <span role="img" aria-label="Voice">🎤</span> Voice
                 </button>
               </li>
               <li>
@@ -130,7 +239,7 @@ function Header({
                   style={navItemStyle(false)}
                   onClick={() => handleNavSelect(onSelectDraw)}
                 >
-                  ✏️ Draw
+                  <span role="img" aria-label="Draw">✏️</span> Draw
                 </button>
               </li>
               <li>
@@ -139,7 +248,7 @@ function Header({
                   style={navItemStyle(false)}
                   onClick={() => handleNavSelect(onSelectEnhanced)}
                 >
-                  ＋ Enhanced
+                  <span role="img" aria-label="Enhanced">＋</span> Enhanced
                 </button>
               </li>
             </ul>

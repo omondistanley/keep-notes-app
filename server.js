@@ -747,6 +747,27 @@ app.get('/api/notes/:id/financial-summary', async (request, response) => {
 });
 
 /**
+ * Historical price data for a symbol (stocks/indexes). Used by Financial modal chart.
+ */
+app.get('/api/financial/history', async (request, response) => {
+  try {
+    const symbol = (request.query.symbol || "").trim().toUpperCase();
+    const range = (request.query.range || "1mo").match(/^(1mo|3mo|6mo|1y)$/) ? request.query.range : "1mo";
+    if (!symbol) {
+      return response.status(400).json({ message: "Missing symbol" });
+    }
+    const result = await financialService.fetchHistoricalPrices(symbol, range);
+    if (!result || !result.data || result.data.length === 0) {
+      return response.status(404).json({ message: "No historical data for symbol" });
+    }
+    response.json(result);
+  } catch (error) {
+    console.error("Error fetching financial history", error);
+    response.status(500).send({ message: "Internal Server Error" });
+  }
+});
+
+/**
  * Top movers: fetch up to 100 gainers/losers/movers tied to note content and news; save to note when type is stock.
  */
 app.get('/api/notes/:id/top-movers', async (request, response) => {

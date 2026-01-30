@@ -324,11 +324,11 @@ const EnhancedNoteForm = ({ note = null, onSave, onCancel }) => {
           <div>
             <label style={{ display: "flex", alignItems: "center", marginBottom: "6px" }}>
               <input type="checkbox" checked={formData.social.x.enabled} onChange={(e) => setFormData(prev => ({ ...prev, social: { ...prev.social, x: { ...prev.social.x, enabled: e.target.checked } } }))} style={{ marginRight: "8px" }} />
-              <span style={{ color: "var(--text-primary)" }}>🐦 X / Twitter</span>
+              <span style={{ color: "var(--text-primary)" }}><span role="img" aria-label="X Twitter">🐦</span> X / Twitter</span>
             </label>
             <label style={{ display: "flex", alignItems: "center", marginBottom: "10px" }}>
               <input type="checkbox" checked={formData.social.reddit.enabled} onChange={(e) => setFormData(prev => ({ ...prev, social: { ...prev.social, reddit: { ...prev.social.reddit, enabled: e.target.checked } } }))} style={{ marginRight: "8px" }} />
-              <span style={{ color: "var(--text-primary)" }}>📱 Reddit</span>
+              <span style={{ color: "var(--text-primary)" }}><span role="img" aria-label="Reddit">📱</span> Reddit</span>
             </label>
             {(formData.social.x.enabled || formData.social.reddit.enabled) && (
               <div>

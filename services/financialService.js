@@ -50,6 +50,31 @@ const TOP_MOVERS_UNIVERSE = [
   "COF", "IT", "MNST", "PSX", "GS", "MS", "RTX", "CARR", "ORLY", "PCAR", "AJG", "MET", "AEP", "GM", "F"
 ];
 
+/** Symbol -> company name for common NYSE/NASDAQ stocks (no API). */
+const SYMBOL_TO_NAME = {
+  AAPL: "Apple Inc.", MSFT: "Microsoft", GOOGL: "Alphabet (Google)", AMZN: "Amazon", NVDA: "NVIDIA", META: "Meta Platforms",
+  "BRK.B": "Berkshire Hathaway", TSLA: "Tesla", JPM: "JPMorgan Chase", V: "Visa", UNH: "UnitedHealth", JNJ: "Johnson & Johnson",
+  WMT: "Walmart", PG: "Procter & Gamble", XOM: "Exxon Mobil", HD: "Home Depot", MA: "Mastercard", CVX: "Chevron",
+  ABBV: "AbbVie", MRK: "Merck", PEP: "PepsiCo", KO: "Coca-Cola", COST: "Costco", AVGO: "Broadcom", LLY: "Eli Lilly",
+  MCD: "McDonald's", DHR: "Danaher", ABT: "Abbott", TMO: "Thermo Fisher", ACN: "Accenture", NEE: "NextEra Energy",
+  WFC: "Wells Fargo", DIS: "Walt Disney", PM: "Philip Morris", CSCO: "Cisco", ADBE: "Adobe", CRM: "Salesforce",
+  VZ: "Verizon", NKE: "Nike", CMCSA: "Comcast", TXN: "Texas Instruments", INTC: "Intel", AMD: "AMD", QCOM: "Qualcomm", T: "AT&T",
+  ORCL: "Oracle", AMGN: "Amgen", HON: "Honeywell", INTU: "Intuit", AMAT: "Applied Materials", IBM: "IBM", SBUX: "Starbucks",
+  LOW: "Lowe's", AXP: "American Express", BKNG: "Booking Holdings", GE: "General Electric", CAT: "Caterpillar", DE: "Deere",
+  MDLZ: "Mondelez", GILD: "Gilead", ADI: "Analog Devices", LMT: "Lockheed Martin", SYK: "Stryker", BLK: "BlackRock",
+  C: "Citigroup", BA: "Boeing", PLD: "Prologis", REGN: "Regeneron", MMC: "Marsh & McLennan", ISRG: "Intuitive Surgical",
+  VRTX: "Vertex", MO: "Altria", ZTS: "Zoetis", CI: "Cigna", SO: "Southern Co", DUK: "Duke Energy", BDX: "Becton Dickinson",
+  BSX: "Boston Scientific", EOG: "EOG Resources", SLB: "Schlumberger", EQIX: "Equinix", CL: "Colgate-Palmolive",
+  MCK: "McKesson", CB: "Chubb", APD: "Air Products", SHW: "Sherwin-Williams", MDT: "Medtronic", WM: "Waste Management",
+  KLAC: "KLA", SNPS: "Synopsys", CDNS: "Cadence", MAR: "Marriott", PSA: "Public Storage", ITW: "Illinois Tool Works",
+  ETN: "Eaton", HCA: "HCA Healthcare", CME: "CME Group", PANW: "Palo Alto Networks", MU: "Micron", NXPI: "NXP",
+  AON: "Aon", SPGI: "S&P Global", ICE: "Intercontinental Exchange", FIS: "FIS", USB: "U.S. Bancorp", PGR: "Progressive",
+  CMG: "Chipotle", ECL: "Ecolab", AIG: "AIG", AFL: "Aflac", NOC: "Northrop Grumman", FCX: "Freeport-McMoRan",
+  EMR: "Emerson Electric", COF: "Capital One", MNST: "Monster Beverage", PSX: "Phillips 66", GS: "Goldman Sachs",
+  MS: "Morgan Stanley", RTX: "RTX", CARR: "Carrier", ORLY: "O'Reilly Auto", PCAR: "PACCAR", AJG: "Arthur J. Gallagher",
+  MET: "MetLife", AEP: "American Electric Power", GM: "General Motors", F: "Ford"
+};
+
 // Common crypto symbol -> CoinGecko id
 const CRYPTO_IDS = {
   btc: "bitcoin",
@@ -447,6 +472,58 @@ class FinancialService {
       topLosers: sortRelevanceFirst(topLosers).slice(0, limit).map((p) => ({ ...p, relevanceScore: p.relevanceScore ?? 0 })),
       largestMovers: sortRelevanceFirst(largestMovers).slice(0, limit).map((p) => ({ ...p, relevanceScore: p.relevanceScore ?? 0 }))
     };
+  }
+
+  /**
+   * Fetch historical daily close prices for a symbol (stocks/indexes) via Yahoo Finance chart API.
+   * @param {string} symbol - Ticker symbol
+   * @param {string} range - "1mo" | "3mo" | "6mo" | "1y"
+   * @returns {{ symbol: string, name?: string, data: Array<{ date: string, close: number }> } | null}
+   */
+  async fetchHistoricalPrices(symbol, range = "1mo") {
+    const sym = String(symbol).trim().toUpperCase();
+    if (!sym) return null;
+    const cacheKey = `historical:${sym}:${range}`;
+    const cached = cacheService.getFinancial(cacheKey);
+    if (cached && Array.isArray(cached.data) && cached.data.length > 0) return cached;
+    try {
+      const res = await axios.get(
+        `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}`,
+        {
+          params: { range, interval: "1d" },
+          timeout: 10000,
+          headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" }
+        }
+      );
+      const chartResult = res.data?.chart?.result?.[0];
+      if (!chartResult) return null;
+      const timestamps = chartResult.timestamp || [];
+      const quote = chartResult.indicators?.quote?.[0];
+      const closes = quote?.close || [];
+      const data = timestamps
+        .map((ts, i) => ({
+          date: new Date(ts * 1000).toISOString().slice(0, 10),
+          close: typeof closes[i] === "number" ? Number(closes[i].toFixed(2)) : null
+        }))
+        .filter((d) => d.close != null);
+    const name = MAJOR_INDEXES.find((i) => i.symbol === sym)?.name || this.getCompanyName(sym);
+    const result = { symbol: sym, name: name || sym, data };
+    if (data.length > 0) cacheService.setFinancial(cacheKey, result);
+    return result;
+    } catch (err) {
+      console.error("Yahoo historical error for", sym, err.message);
+      return null;
+    }
+  }
+
+  /**
+   * Resolve company or index name for a symbol (indexes + common stocks). No API call.
+   */
+  getCompanyName(symbol) {
+    const sym = String(symbol || "").trim().toUpperCase();
+    const fromIndex = MAJOR_INDEXES.find((i) => i.symbol === sym);
+    if (fromIndex) return fromIndex.name;
+    return SYMBOL_TO_NAME[sym] || null;
   }
 
   /**

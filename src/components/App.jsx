@@ -23,6 +23,8 @@ import DeadlinesView from "./DeadlinesView";
 import useWebSocket from "../hooks/useWebSocket";
 import { useTheme } from "../contexts/ThemeContext";
 import { API_BASE, WS_URL } from "../config";
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import { getSymbolDisplay } from "../constants/symbolNames";
 
 function App() {
   const { theme, toggleTheme } = useTheme();
@@ -31,8 +33,11 @@ function App() {
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("updatedAt");
   const [sortOrder, setSortOrder] = useState("desc");
+  // eslint-disable-next-line no-unused-vars
   const [filterTags, setFilterTags] = useState([]);
+  // eslint-disable-next-line no-unused-vars
   const [filterPriority, setFilterPriority] = useState("");
+  // eslint-disable-next-line no-unused-vars
   const [showArchived, setShowArchived] = useState(false);
   const [showTrash, setShowTrash] = useState(false);
   const [showExportImport, setShowExportImport] = useState(false);
@@ -48,11 +53,17 @@ function App() {
   const [openNoteModalId, setOpenNoteModalId] = useState(null);
   const [openNewsModalNoteId, setOpenNewsModalNoteId] = useState(null);
   const [openFinancialModalNoteId, setOpenFinancialModalNoteId] = useState(null);
+  const [financialChartSymbol, setFinancialChartSymbol] = useState(null);
+  const [financialChartData, setFinancialChartData] = useState(null);
+  const [financialChartLoading, setFinancialChartLoading] = useState(false);
+  const [financialChartRange, setFinancialChartRange] = useState("1mo");
   const [navOpen, setNavOpen] = useState(false);
   const [topMoversLoadingId, setTopMoversLoadingId] = useState(null);
+  // eslint-disable-next-line no-unused-vars
   const [availableTags, setAvailableTags] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [notesPerPage] = useState(20);
+  const [selectedNoteIdForView, setSelectedNoteIdForView] = useState(null);
 
   /**
    * Fetches the notes from the API when the component mounts. 
@@ -206,6 +217,27 @@ function App() {
     if (!res.ok) throw new Error(data.message || "Failed to update all");
     await fetchNotes();
   }, [fetchNotes]);
+
+  const loadFinancialChart = useCallback(async (symbol, range = "1mo") => {
+    if (!symbol) return;
+    setFinancialChartSymbol(symbol);
+    setFinancialChartLoading(true);
+    setFinancialChartData(null);
+    try {
+      const res = await fetch(`${API_BASE}/api/financial/history?symbol=${encodeURIComponent(symbol)}&range=${range}`);
+      const data = await res.json().catch(() => null);
+      if (res.ok && data && data.data && data.data.length > 0) {
+        setFinancialChartData(data);
+        setFinancialChartRange(range);
+      } else {
+        setFinancialChartData(null);
+      }
+    } catch (e) {
+      setFinancialChartData(null);
+    } finally {
+      setFinancialChartLoading(false);
+    }
+  }, []);
 
   // Refetch notes when filters change
   useEffect(() => {
@@ -449,22 +481,94 @@ function App() {
   };
 
   return (
-    <div style={{ background: theme === "dark" ? "#1a1a1a" : "#eee", minHeight: "100vh", paddingBottom: "60px" }}>
-      <Header
-        navOpen={navOpen}
-        onNavToggle={setNavOpen}
-        activeView={activeView}
-        onSelectNotes={() => { closeAllModals(); setNavOpen(false); }}
-        onSelectDashboard={() => { setShowTrash(false); setShowExportImport(false); setShowDeadlines(false); setShowDashboard(true); }}
-        onSelectDeadlines={() => { setShowDashboard(false); setShowTrash(false); setShowExportImport(false); setShowDeadlines(true); }}
-        onSelectTrash={() => { setShowDashboard(false); setShowExportImport(false); setShowDeadlines(false); setShowTrash(true); }}
-        onSelectExportImport={() => { setShowTrash(false); setShowDashboard(false); setShowDeadlines(false); setShowExportImport(true); }}
-        onSelectSplitView={() => { setShowSplitView(true); }}
-        onSelectVoice={() => { setShowVoiceRecorder(true); setShowDrawing(false); }}
-        onSelectDraw={() => { setShowDrawing(true); setShowVoiceRecorder(false); }}
-        onSelectEnhanced={() => { setShowEnhancedForm(true); setSelectedNoteId(null); }}
-      />
-      <ThemeToggle />
+    <div style={{ background: theme === "dark" ? "#1a1a1a" : "#eee", minHeight: "100vh" }}>
+      <div className="app-layout">
+        <aside className="app-sidebar">
+          <Header
+            sidebar
+            navOpen={navOpen}
+            onNavToggle={setNavOpen}
+            activeView={activeView}
+            onSelectNotes={() => { closeAllModals(); setNavOpen(false); }}
+            onSelectDashboard={() => { setShowTrash(false); setShowExportImport(false); setShowDeadlines(false); setShowDashboard(true); }}
+            onSelectDeadlines={() => { setShowDashboard(false); setShowTrash(false); setShowExportImport(false); setShowDeadlines(true); }}
+            onSelectTrash={() => { setShowDashboard(false); setShowExportImport(false); setShowDeadlines(false); setShowTrash(true); }}
+            onSelectExportImport={() => { setShowTrash(false); setShowDashboard(false); setShowDeadlines(false); setShowExportImport(true); }}
+            onSelectSplitView={() => { setShowSplitView(true); }}
+            onSelectVoice={() => { setShowVoiceRecorder(true); setShowDrawing(false); }}
+            onSelectDraw={() => { setShowDrawing(true); setShowVoiceRecorder(false); }}
+            onSelectEnhanced={() => { setShowEnhancedForm(true); setSelectedNoteId(null); }}
+          />
+          <div className="sidebar-search-wrap">
+            <input
+              ref={searchInputRef}
+              type="text"
+              placeholder="Search notes..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{ width: "100%", padding: "8px", fontSize: "13px", border: "1px solid rgba(0,0,0,0.15)", borderRadius: "6px", marginBottom: "6px" }}
+            />
+            <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }}>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                style={{ flex: 1, minWidth: "0", padding: "6px", fontSize: "12px", border: "1px solid rgba(0,0,0,0.15)", borderRadius: "6px" }}
+              >
+                <option value="updatedAt">Updated</option>
+                <option value="createdAt">Created</option>
+                <option value="title">Title</option>
+                <option value="priority">Priority</option>
+              </select>
+              <button
+                type="button"
+                onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
+                style={{ padding: "6px 10px", fontSize: "12px", border: "1px solid rgba(0,0,0,0.15)", borderRadius: "6px", background: "rgba(255,255,255,0.3)", cursor: "pointer" }}
+              >
+                {sortOrder === "asc" ? "↑" : "↓"}
+              </button>
+            </div>
+          </div>
+          <div className="sidebar-notes-label"><span role="img" aria-label="Folder">📁</span> Saved notes</div>
+          <div className="sidebar-notes-list">
+            {paginatedNotes.length === 0 ? (
+              <p style={{ padding: "8px 12px", fontSize: "12px", color: "rgba(0,0,0,0.6)", margin: 0 }}>{searchQuery ? "No matches" : "No notes yet"}</p>
+            ) : (
+              paginatedNotes.map((noteItem) => (
+                <button
+                  key={noteItem._id}
+                  type="button"
+                  className={`sidebar-note-item ${selectedNoteIdForView === noteItem._id ? "active" : ""}`}
+                  onClick={() => setSelectedNoteIdForView(noteItem._id)}
+                >
+                  {noteItem.title || "Untitled"}
+                </button>
+              ))
+            )}
+            {totalPages > 1 && (
+              <div style={{ display: "flex", gap: "6px", justifyContent: "center", marginTop: "8px", flexWrap: "wrap" }}>
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  style={{ padding: "4px 10px", fontSize: "12px", border: "none", borderRadius: "4px", background: "rgba(255,255,255,0.3)", cursor: currentPage === 1 ? "not-allowed" : "pointer" }}
+                >
+                  Prev
+                </button>
+                <span style={{ padding: "4px 8px", fontSize: "12px" }}>{currentPage}/{totalPages}</span>
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  style={{ padding: "4px 10px", fontSize: "12px", border: "none", borderRadius: "4px", background: "rgba(255,255,255,0.3)", cursor: currentPage === totalPages ? "not-allowed" : "pointer" }}
+                >
+                  Next
+                </button>
+              </div>
+            )}
+          </div>
+        </aside>
+        <main className="app-main">
+          <ThemeToggle />
       
       <CommandPalette
         isOpen={showCommandPalette}
@@ -671,7 +775,7 @@ function App() {
         );
       })()}
 
-      {/* Financial modal: top 100 gainers/losers/movers (relevance-first), then your symbols */}
+      {/* Financial modal: top 100 gainers/losers/movers (relevance-first), then your symbols; click symbol for chart */}
       {openFinancialModalNoteId && (() => {
         const note = notes.find(n => n._id === openFinancialModalNoteId);
         if (!note) return null;
@@ -695,12 +799,59 @@ function App() {
             setTopMoversLoadingId(null);
           }
         };
+        const closeModal = () => {
+          setOpenFinancialModalNoteId(null);
+          setFinancialChartSymbol(null);
+          setFinancialChartData(null);
+        };
+        const rowStyle = (clickable) => ({
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          padding: clickable ? "6px 8px" : "4px 0",
+          borderBottom: "1px solid #f0f0f0",
+          borderRadius: clickable ? "4px" : 0,
+          background: clickable ? "var(--bg-tertiary, #f9f9f9)" : "transparent",
+          cursor: clickable ? "pointer" : "default",
+          transition: "background 0.15s ease"
+        });
+        const renderSymbolRow = (p, clickable = true) => {
+          const sym = (p.symbol || "").toUpperCase();
+          const label = getSymbolDisplay(sym, p.name);
+          const content = (
+            <>
+              <span title={label}>
+                {label.length > 28 ? label.slice(0, 26) + "…" : label}
+                {((p.relevanceScore ?? 0) > 0.3 || p.inUserList) && <span style={{ marginLeft: "6px", fontSize: "10px", color: "#1976d2", fontWeight: "bold" }}>• relevant</span>}
+              </span>
+              {p.price != null && <span>{Number(p.price ?? p.last ?? 0).toFixed(2)}</span>}
+              <span style={{ color: (p.changePercent >= 0) ? "#2e7d32" : "#c62828" }}>
+                {p.changePercent != null ? `${p.changePercent >= 0 ? "+" : ""}${Number(p.changePercent).toFixed(1)}%` : "—"}
+              </span>
+            </>
+          );
+          if (clickable && type === "stock") {
+            return (
+              <li
+                key={sym}
+                style={rowStyle(true)}
+                onClick={() => loadFinancialChart(sym, financialChartRange)}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); loadFinancialChart(sym, financialChartRange); } }}
+                role="button"
+                tabIndex={0}
+              >
+                {content}
+              </li>
+            );
+          }
+          return <li key={sym} style={rowStyle(false)}>{content}</li>;
+        };
         return (
           <div
             role="dialog"
             aria-modal="true"
             aria-label="Financial"
-            onClick={() => setOpenFinancialModalNoteId(null)}
+            onClick={closeModal}
             style={{
               position: "fixed",
               inset: 0,
@@ -718,7 +869,7 @@ function App() {
                 background: "var(--bg-secondary, #fff)",
                 borderRadius: "8px",
                 boxShadow: "0 4px 20px rgba(0,0,0,0.2)",
-                maxWidth: "560px",
+                maxWidth: "640px",
                 width: "100%",
                 maxHeight: "90vh",
                 overflow: "auto",
@@ -733,21 +884,70 @@ function App() {
                       {topMoversLoading ? "Loading…" : "Load top 100 movers"}
                     </button>
                   )}
-                  <button type="button" onClick={() => setOpenFinancialModalNoteId(null)} style={{ padding: "6px 12px", background: "#666", color: "#fff", border: "none", borderRadius: "4px", cursor: "pointer" }}>Close</button>
+                  <button type="button" onClick={closeModal} style={{ padding: "6px 12px", background: "#666", color: "#fff", border: "none", borderRadius: "4px", cursor: "pointer" }}>Close</button>
                 </div>
               </div>
               <div style={{ padding: "16px" }}>
+                {/* Chart: show when a symbol was clicked (stocks/indexes only) */}
+                {(financialChartData || financialChartLoading) && type === "stock" && (
+                  <section style={{ marginBottom: "16px", padding: "12px", background: "var(--bg-tertiary, #f5f5f5)", borderRadius: "8px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px", flexWrap: "wrap", gap: "8px" }}>
+                      <strong style={{ color: "var(--text-primary)" }}>
+                        {financialChartLoading ? "Loading chart…" : (financialChartData?.name || financialChartSymbol) + " over time"}
+                      </strong>
+                      <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                        {["1mo", "3mo", "6mo", "1y"].map((r) => (
+                          <button
+                            key={r}
+                            type="button"
+                            onClick={() => loadFinancialChart(financialChartSymbol, r)}
+                            disabled={financialChartLoading}
+                            style={{
+                              padding: "4px 10px",
+                              fontSize: "12px",
+                              border: "1px solid #ccc",
+                              borderRadius: "4px",
+                              background: financialChartRange === r ? "#f5ba13" : "var(--bg-secondary, #fff)",
+                              color: financialChartRange === r ? "#fff" : "var(--text-primary)",
+                              cursor: financialChartLoading ? "wait" : "pointer"
+                            }}
+                          >
+                            {r}
+                          </button>
+                        ))}
+                        <button type="button" onClick={() => { setFinancialChartData(null); setFinancialChartSymbol(null); }} style={{ padding: "4px 10px", fontSize: "12px", border: "1px solid #ccc", borderRadius: "4px", background: "var(--bg-secondary)", cursor: "pointer" }}>✕</button>
+                      </div>
+                    </div>
+                    {financialChartData && financialChartData.data && financialChartData.data.length > 0 && (
+                      <ResponsiveContainer width="100%" height={220}>
+                        <LineChart data={financialChartData.data} margin={{ top: 4, right: 4, left: 4, bottom: 4 }}>
+                          <XAxis dataKey="date" tick={{ fontSize: 10 }} />
+                          <YAxis domain={["auto", "auto"]} tick={{ fontSize: 10 }} tickFormatter={(v) => Number(v).toFixed(0)} />
+                          <Tooltip formatter={(v) => [Number(v).toFixed(2), "Close"]} labelFormatter={(l) => l} />
+                          <Line type="monotone" dataKey="close" stroke="#1976d2" strokeWidth={2} dot={false} />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    )}
+                  </section>
+                )}
                 {!hasTopMovers && prices.length === 0 ? (
-                  <p style={{ color: "var(--text-secondary, #666)" }}>No price data yet. Use &quot;Update financial&quot; on the note. For stocks, &quot;Load top 100 movers&quot; shows market-wide gainers/losers/movers, ordered by relevance to your note and news.</p>
+                  <p style={{ color: "var(--text-secondary, #666)" }}>No price data yet. Use &quot;Update financial&quot; on the note. For stocks, &quot;Load top 100 movers&quot; shows market-wide gainers/losers/movers. Click a symbol to see a chart over time.</p>
                 ) : (
                   <>
                     {indexes.length > 0 && (
                       <section style={{ marginBottom: "16px" }}>
                         <h3 style={{ fontSize: "14px", marginBottom: "8px", color: "var(--text-primary)" }}>Major indexes</h3>
-                        <ul style={{ listStyle: "none", padding: 0, margin: 0, fontSize: "13px", display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: "8px" }}>
+                        <ul style={{ listStyle: "none", padding: 0, margin: 0, fontSize: "13px", display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: "8px" }}>
                           {indexes.map((p, i) => (
-                            <li key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 8px", borderBottom: "1px solid #f0f0f0", borderRadius: "4px", background: "var(--bg-tertiary, #f9f9f9)" }}>
-                              <span title={p.name || p.symbol}>{p.symbol}</span>
+                            <li
+                              key={i}
+                              style={rowStyle(true)}
+                              onClick={() => type === "stock" && loadFinancialChart((p.symbol || "").toUpperCase(), financialChartRange)}
+                              onKeyDown={(e) => { if (type === "stock" && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); loadFinancialChart((p.symbol || "").toUpperCase(), financialChartRange); } }}
+                              role="button"
+                              tabIndex={0}
+                            >
+                              <span title={p.name || p.symbol}>{getSymbolDisplay((p.symbol || "").toUpperCase(), p.name)}</span>
                               <span style={{ color: (p.changePercent >= 0) ? "#2e7d32" : "#c62828" }}>
                                 {p.changePercent != null ? `${p.changePercent >= 0 ? "+" : ""}${Number(p.changePercent).toFixed(1)}%` : "—"}
                               </span>
@@ -756,23 +956,12 @@ function App() {
                         </ul>
                       </section>
                     )}
-                    {hasTopMovers && <p style={{ fontSize: "12px", color: "var(--text-secondary)", marginBottom: "12px" }}>Top 100 stocks (relevance to this note and its news first).</p>}
+                    {hasTopMovers && <p style={{ fontSize: "12px", color: "var(--text-secondary)", marginBottom: "12px" }}>Top 100 stocks (relevance first). Click a symbol to see chart.</p>}
                     {largestMovers.length > 0 && (
                       <section style={{ marginBottom: "16px" }}>
                         <h3 style={{ fontSize: "14px", marginBottom: "8px", color: "var(--text-primary)" }}>Largest movers ({largestMovers.length})</h3>
                         <ul style={{ listStyle: "none", padding: 0, margin: 0, fontSize: "13px", maxHeight: "200px", overflowY: "auto" }}>
-                          {largestMovers.map((p, i) => (
-                            <li key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0", borderBottom: "1px solid #f0f0f0" }}>
-                              <span>
-                                {p.symbol}
-                                {((p.relevanceScore ?? 0) > 0.3 || p.inUserList) && <span style={{ marginLeft: "6px", fontSize: "10px", color: "#1976d2", fontWeight: "bold" }}>• relevant</span>}
-                              </span>
-                              <span>{Number(p.price ?? p.last ?? 0).toFixed(2)}</span>
-                              <span style={{ color: (p.changePercent >= 0) ? "#2e7d32" : "#c62828" }}>
-                                {p.changePercent != null ? `${p.changePercent >= 0 ? "+" : ""}${Number(p.changePercent).toFixed(1)}%` : "—"}
-                              </span>
-                            </li>
-                          ))}
+                          {largestMovers.map((p, i) => renderSymbolRow(p))}
                         </ul>
                       </section>
                     )}
@@ -780,16 +969,7 @@ function App() {
                       <section style={{ marginBottom: "16px" }}>
                         <h3 style={{ fontSize: "14px", marginBottom: "8px", color: "#2e7d32" }}>Top gainers ({topGainers.length})</h3>
                         <ul style={{ listStyle: "none", padding: 0, margin: 0, fontSize: "13px", maxHeight: "200px", overflowY: "auto" }}>
-                          {topGainers.map((p, i) => (
-                            <li key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0", borderBottom: "1px solid #f0f0f0" }}>
-                              <span>
-                                {p.symbol}
-                                {((p.relevanceScore ?? 0) > 0.3 || p.inUserList) && <span style={{ marginLeft: "6px", fontSize: "10px", color: "#1976d2", fontWeight: "bold" }}>• relevant</span>}
-                              </span>
-                              <span>{Number(p.price ?? p.last ?? 0).toFixed(2)}</span>
-                              <span style={{ color: "#2e7d32" }}>{p.changePercent != null ? `+${Number(p.changePercent).toFixed(1)}%` : "—"}</span>
-                            </li>
-                          ))}
+                          {topGainers.map((p, i) => renderSymbolRow(p))}
                         </ul>
                       </section>
                     )}
@@ -797,16 +977,7 @@ function App() {
                       <section style={{ marginBottom: "16px" }}>
                         <h3 style={{ fontSize: "14px", marginBottom: "8px", color: "#c62828" }}>Top losers ({topLosers.length})</h3>
                         <ul style={{ listStyle: "none", padding: 0, margin: 0, fontSize: "13px", maxHeight: "200px", overflowY: "auto" }}>
-                          {topLosers.map((p, i) => (
-                            <li key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0", borderBottom: "1px solid #f0f0f0" }}>
-                              <span>
-                                {p.symbol}
-                                {((p.relevanceScore ?? 0) > 0.3 || p.inUserList) && <span style={{ marginLeft: "6px", fontSize: "10px", color: "#1976d2", fontWeight: "bold" }}>• relevant</span>}
-                              </span>
-                              <span>{Number(p.price ?? p.last ?? 0).toFixed(2)}</span>
-                              <span style={{ color: "#c62828" }}>{p.changePercent != null ? `${Number(p.changePercent).toFixed(1)}%` : "—"}</span>
-                            </li>
-                          ))}
+                          {topLosers.map((p, i) => renderSymbolRow(p))}
                         </ul>
                       </section>
                     )}
@@ -814,15 +985,7 @@ function App() {
                       <section>
                         <h3 style={{ fontSize: "14px", marginBottom: "8px", color: "var(--text-primary)" }}>Your symbols</h3>
                         <ul style={{ listStyle: "none", padding: 0, margin: 0, fontSize: "13px" }}>
-                          {prices.map((p, i) => (
-                            <li key={i} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", borderBottom: "1px solid #f0f0f0" }}>
-                              <span>{p.symbol}</span>
-                              <span>{Number(p.price ?? p.last ?? 0).toFixed(2)}</span>
-                              <span style={{ color: (p.changePercent >= 0) ? "#2e7d32" : "#c62828" }}>
-                                {p.changePercent != null ? `${p.changePercent >= 0 ? "+" : ""}${Number(p.changePercent).toFixed(1)}%` : "—"}
-                              </span>
-                            </li>
-                          ))}
+                          {prices.map((p, i) => renderSymbolRow(p))}
                         </ul>
                       </section>
                     )}
@@ -890,7 +1053,7 @@ function App() {
         <div role="dialog" aria-modal="true" aria-label="Dashboard" style={modalOverlayStyle} onClick={() => setShowDashboard(false)}>
           <div style={modalContentStyle} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-              <h2 style={{ margin: 0, color: "var(--text-primary)" }}>📊 Integration Dashboard</h2>
+              <h2 style={{ margin: 0, color: "var(--text-primary)" }}><span role="img" aria-label="Dashboard">📊</span> Integration Dashboard</h2>
               <button type="button" onClick={() => setShowDashboard(false)} style={{ padding: "8px 16px", background: "#666", color: "#fff", border: "none", borderRadius: "4px", cursor: "pointer" }}>Close</button>
             </div>
             <IntegrationDashboard />
@@ -901,7 +1064,7 @@ function App() {
         <div role="dialog" aria-modal="true" aria-label="Trash" style={modalOverlayStyle} onClick={() => setShowTrash(false)}>
           <div style={modalContentStyle} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-              <h2 style={{ margin: 0, color: "var(--text-primary)" }}>🗑️ Trash</h2>
+              <h2 style={{ margin: 0, color: "var(--text-primary)" }}><span role="img" aria-label="Trash">🗑️</span> Trash</h2>
               <button type="button" onClick={() => setShowTrash(false)} style={{ padding: "8px 16px", background: "#666", color: "#fff", border: "none", borderRadius: "4px", cursor: "pointer" }}>Close</button>
             </div>
             <TrashView onRestore={fetchNotes} onDeletePermanent={fetchNotes} />
@@ -912,7 +1075,7 @@ function App() {
         <div role="dialog" aria-modal="true" aria-label="Export / Import" style={modalOverlayStyle} onClick={() => setShowExportImport(false)}>
           <div style={modalContentStyle} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-              <h2 style={{ margin: 0, color: "var(--text-primary)" }}>📤 Export / Import</h2>
+              <h2 style={{ margin: 0, color: "var(--text-primary)" }}><span role="img" aria-label="Export Import">📤</span> Export / Import</h2>
               <button type="button" onClick={() => setShowExportImport(false)} style={{ padding: "8px 16px", background: "#666", color: "#fff", border: "none", borderRadius: "4px", cursor: "pointer" }}>Close</button>
             </div>
             <ExportImport notes={notes} onImport={handleImport} />
@@ -923,7 +1086,7 @@ function App() {
         <div role="dialog" aria-modal="true" aria-label="Deadlines" style={modalOverlayStyle} onClick={() => setShowDeadlines(false)}>
           <div style={modalContentStyle} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-              <h2 style={{ margin: 0, color: "var(--text-primary)" }}>📅 Deadlines</h2>
+              <h2 style={{ margin: 0, color: "var(--text-primary)" }}><span role="img" aria-label="Deadlines">📅</span> Deadlines</h2>
               <button type="button" onClick={() => setShowDeadlines(false)} style={{ padding: "8px 16px", background: "#666", color: "#fff", border: "none", borderRadius: "4px", cursor: "pointer" }}>Close</button>
             </div>
             <DeadlinesView onRefresh={fetchNotes} />
@@ -932,227 +1095,57 @@ function App() {
       )}
 
       {!showSplitView && !showEnhancedForm && !showVoiceRecorder && !showDrawing ? (
-        <>
-          {/* Search and Filter Bar */}
-          <div className="search-filter-container" style={{
-            width: "480px",
-            margin: "20px auto",
-            padding: "15px",
-            background: "var(--bg-secondary)",
-            borderRadius: "7px",
-            boxShadow: "0 1px 5px var(--shadow)"
-          }}>
-        <input
-          ref={searchInputRef}
-          type="text"
-          placeholder="Search notes..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          style={{
-            width: "100%",
-            padding: "8px",
-            fontSize: "14px",
-            border: "1px solid #ddd",
-            borderRadius: "4px",
-            marginBottom: "10px"
-          }}
-        />
-        
-        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginBottom: "10px" }}>
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
-            style={{ padding: "6px", fontSize: "12px", border: "1px solid #ddd", borderRadius: "4px" }}
-          >
-            <option value="updatedAt">Sort by: Updated</option>
-            <option value="createdAt">Sort by: Created</option>
-            <option value="title">Sort by: Title</option>
-            <option value="priority">Sort by: Priority</option>
-          </select>
-          
-          <button
-            onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
-            style={{
-              padding: "6px 12px",
-              fontSize: "12px",
-              border: "1px solid #ddd",
-              borderRadius: "4px",
-              background: "#f5ba13",
-              color: "white",
-              cursor: "pointer"
-            }}
-          >
-            {sortOrder === "asc" ? "↑" : "↓"}
-          </button>
-          
-          <select
-            value={filterPriority}
-            onChange={(e) => setFilterPriority(e.target.value)}
-            style={{ padding: "6px", fontSize: "12px", border: "1px solid #ddd", borderRadius: "4px" }}
-          >
-            <option value="">All Priorities</option>
-            <option value="urgent">Urgent</option>
-            <option value="high">High</option>
-            <option value="medium">Medium</option>
-            <option value="low">Low</option>
-          </select>
-          
-          <button
-            onClick={() => setShowArchived(!showArchived)}
-            style={{
-              padding: "6px 12px",
-              fontSize: "12px",
-              border: "1px solid #ddd",
-              borderRadius: "4px",
-              background: showArchived ? "#ff9800" : "#fff",
-              color: showArchived ? "white" : "black",
-              cursor: "pointer"
-            }}
-          >
-            {showArchived ? "📦 Archived" : "📁 Archive"}
-          </button>
-        </div>
-        
-        {/* Tag Filters */}
-        {availableTags.length > 0 && (
-          <div style={{ marginTop: "10px" }}>
-            <div style={{ fontSize: "12px", marginBottom: "5px" }}>Filter by tags:</div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "5px" }}>
-              {availableTags.map((tag) => (
-                <button
-                  key={tag}
-                  onClick={() => {
-                    if (filterTags.includes(tag)) {
-                      setFilterTags(filterTags.filter(t => t !== tag));
-                    } else {
-                      setFilterTags([...filterTags, tag]);
-                    }
-                  }}
-                  style={{
-                    padding: "4px 8px",
-                    fontSize: "11px",
-                    border: "1px solid #ddd",
-                    borderRadius: "12px",
-                    background: filterTags.includes(tag) ? "#f5ba13" : "#fff",
-                    color: filterTags.includes(tag) ? "white" : "black",
-                    cursor: "pointer"
-                  }}
-                >
-                  {tag}
-                </button>
-              ))}
-            </div>
+        <div className="app-main-content">
+          <div style={{ position: "relative", marginBottom: "16px" }}>
+            <TemplateSelector onSelectTemplate={handleTemplateSelect} />
           </div>
-        )}
-      </div>
-      
-            <div style={{ position: "relative", width: "480px", margin: "20px auto" }}>
-              <TemplateSelector onSelectTemplate={handleTemplateSelect} />
+          <CreateArea onAdd={addNote} />
+          {selectedNoteIdForView ? (() => {
+            const noteItem = notes.find(n => n._id === selectedNoteIdForView);
+            if (!noteItem) return <div className="app-main-placeholder">Note not found.</div>;
+            return (
+              <div style={{ marginTop: "20px", maxWidth: "100%" }}>
+                <Note
+                  key={noteItem._id}
+                  id={noteItem._id}
+                  title={noteItem.title}
+                  content={noteItem.content}
+                  tags={noteItem.tags || []}
+                  priority={noteItem.priority}
+                  isPinned={noteItem.isPinned}
+                  isArchived={noteItem.isArchived}
+                  deadline={noteItem.deadline}
+                  news={noteItem.news}
+                  financial={noteItem.financial}
+                  social={noteItem.social}
+                  attachments={noteItem.attachments}
+                  drawings={noteItem.drawings}
+                  onOpenModal={() => setOpenNoteModalId(noteItem._id)}
+                  onOpenNewsModal={() => setOpenNewsModalNoteId(noteItem._id)}
+                  onOpenFinancialModal={() => setOpenFinancialModalNoteId(noteItem._id)}
+                  onDelete={() => { deleteNote(noteItem._id); setSelectedNoteIdForView(null); }}
+                  onUpdate={updateNote}
+                  onPin={pinNote}
+                  onArchive={archiveNote}
+                  onTrash={trashNote}
+                  onOpenEnhancedEdit={() => openEnhancedFormForNote(noteItem._id)}
+                  onFetchNews={fetchNewsForNote}
+                  onFetchTweets={fetchTweetsForNote}
+                  onUpdateFinancial={updateFinancialForNote}
+                  onUpdateAll={updateAllForNote}
+                  onIntegrationComplete={fetchNotes}
+                />
+              </div>
+            );
+          })() : (
+            <div className="app-main-placeholder">
+              Select a note from the left or create one above.
             </div>
-            
-            <CreateArea onAdd={addNote} />
-            
-            {/* Pagination Info */}
-            {notes.length > notesPerPage && (
-              <div style={{
-                width: "480px",
-                margin: "10px auto",
-                textAlign: "center",
-                color: "var(--text-secondary)",
-                fontSize: "14px"
-              }}>
-                Showing {((currentPage - 1) * notesPerPage) + 1} - {Math.min(currentPage * notesPerPage, notes.length)} of {notes.length} notes
-              </div>
-            )}
-
-            {paginatedNotes.length === 0 ? (
-              <div style={{ textAlign: "center", padding: "20px", color: "var(--text-secondary)" }}>
-                {showArchived ? "No archived notes" : searchQuery ? "No notes found" : "No notes yet. Create one!"}
-              </div>
-            ) : (
-              <>
-                {paginatedNotes.map((noteItem) => (
-                  <Note
-                    key={noteItem._id}
-                    id={noteItem._id}
-                    title={noteItem.title}
-                    content={noteItem.content}
-                    tags={noteItem.tags || []}
-                    priority={noteItem.priority}
-                    isPinned={noteItem.isPinned}
-                    isArchived={noteItem.isArchived}
-                    deadline={noteItem.deadline}
-                    news={noteItem.news}
-                    financial={noteItem.financial}
-                    social={noteItem.social}
-                    attachments={noteItem.attachments}
-                    drawings={noteItem.drawings}
-                    onOpenModal={() => setOpenNoteModalId(noteItem._id)}
-                    onOpenNewsModal={() => setOpenNewsModalNoteId(noteItem._id)}
-                    onOpenFinancialModal={() => setOpenFinancialModalNoteId(noteItem._id)}
-                    onDelete={() => deleteNote(noteItem._id)}
-                    onUpdate={updateNote}
-                    onPin={pinNote}
-                    onArchive={archiveNote}
-                    onTrash={trashNote}
-                    onOpenEnhancedEdit={() => openEnhancedFormForNote(noteItem._id)}
-                    onFetchNews={fetchNewsForNote}
-                    onFetchTweets={fetchTweetsForNote}
-                    onUpdateFinancial={updateFinancialForNote}
-                    onUpdateAll={updateAllForNote}
-                    onIntegrationComplete={fetchNotes}
-                  />
-                ))}
-                
-                {/* Pagination Controls */}
-                {totalPages > 1 && (
-                  <div className="pagination-controls" style={{
-                    width: "480px",
-                    margin: "20px auto",
-                    display: "flex",
-                    justifyContent: "center",
-                    gap: "10px"
-                  }}>
-                    <button
-                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                      disabled={currentPage === 1}
-                      style={{
-                        padding: "8px 16px",
-                        background: currentPage === 1 ? "#ccc" : "#f5ba13",
-                        color: "white",
-                        border: "none",
-                        borderRadius: "4px",
-                        cursor: currentPage === 1 ? "not-allowed" : "pointer"
-                      }}
-                    >
-                      Previous
-                    </button>
-                    <span style={{
-                      padding: "8px 16px",
-                      color: "var(--text-primary)"
-                    }}>
-                      Page {currentPage} of {totalPages}
-                    </span>
-                    <button
-                      onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                      disabled={currentPage === totalPages}
-                      style={{
-                        padding: "8px 16px",
-                        background: currentPage === totalPages ? "#ccc" : "#f5ba13",
-                        color: "white",
-                        border: "none",
-                        borderRadius: "4px",
-                        cursor: currentPage === totalPages ? "not-allowed" : "pointer"
-                      }}
-                    >
-                      Next
-                    </button>
-                  </div>
-                )}
-              </>
-            )}
-          </>
-        ) : null}
+          )}
+        </div>
+      ) : null}
+        </main>
+      </div>
       <Footer />
     </div>
   );
